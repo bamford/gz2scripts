@@ -58,10 +58,10 @@ def plot(zbin=5, fname='zoo_wvt_bins', logplot=False):
     nodes = nodes[:,(nodes[0] > 0.001) & (nodes[1] > 0.001)]    
     bin_min, bin_max, bin_step = bins['MR']
     bin_step /= binoversamp
-    nodes[1] = nodes[1] * bin_step + bin_min
+    nodes[1] = (nodes[1] + 0.5) * bin_step + bin_min
     bin_min, bin_max, bin_step = bins['R50_KPC']
     bin_step /= binoversamp
-    nodes[0] = nodes[0] * bin_step + bin_min
+    nodes[0] = (nodes[0] + 0.5) * bin_step + bin_min
     f = data_path+data_file
     p = pyfits.open(f)
     zbins = p['REDSHIFT_ZOO_OVERSAMPLED_BINS'].data
@@ -82,7 +82,7 @@ def plot(zbin=5, fname='zoo_wvt_bins', logplot=False):
     if 'density' in fname and logplot:
         pgimag_s(hires(d), fg_count, bg_count)
     else:
-        pgimag_s(hires(d), d.max()*1.1, d.min()*0.9)
+        pgimag_s(hires(d), d.max()*1.05, d.min()*0.9)
     print d.max(), d.min()
     pgbox('BCN', 0, 0, 'BCN', 0, 0)
     pgxsci('white')
@@ -107,30 +107,28 @@ def add_wvt():
     p = pyfits.open(f)
     d = p['DATA'].data
     zbin = d.field('REDSHIFT_ZOO_OVERSAMPLED_BIN')
+    nowvt = (zbin > max_zbin) | (zbin < min_zbin)
     zbin = N.where(zbin > max_zbin, max_zbin, zbin)
     zbin = N.where(zbin < min_zbin, min_zbin, zbin)
     magbin = d.field('MR_ZOO_OVERSAMPLED_BIN')
+    nowvt |= (magbin > max_magbin) | (magbin < min_magbin)
     magbin = N.where(magbin > max_magbin, max_magbin, magbin)
     magbin = N.where(magbin < min_magbin, min_magbin, magbin)
     sizebin = d.field('R50_KPC_ZOO_OVERSAMPLED_BIN')
+    nowvt |= (sizebin > max_sizebin) | (sizebin < min_sizebin)
     sizebin = N.where(sizebin > max_sizebin, max_sizebin, sizebin)
     sizebin = N.where(sizebin < min_sizebin, min_sizebin, sizebin)
     wvtbin = wvt[zbin, magbin, sizebin]
+    # put wvtbin = 0 where galaxy is not in a wvt bin
+    wvtbin = N.where(nowvt, 0, wvtbin)
     oldcols = p['DATA'].columns
     cols = []
-    smallcols = []
     for c in oldcols:
 	name = c.name
 	cols.append(pyfits.Column(name=c.name, format=c.format,
 				  array=d.field(c.name)))
     cols.append(pyfits.Column(name='WVTBIN', format='I',
 			      array=wvtbin))
-    smallcols.append(pyfits.Column(name='OBJID', format='K',
-                                   array=d.OBJID))
-    smallcols.append(pyfits.Column(name='ZBIN', format='I',
-                                   array=d.REDSHIFT_ZOO_OVERSAMPLED_BIN))
-    smallcols.append(pyfits.Column(name='WVTBIN', format='I',
-                                   array=wvtbin))
     hdulist = pyfits.HDUList()
     hdulist.append(pyfits.PrimaryHDU())
     tbhdu=pyfits.new_table(cols)
@@ -144,8 +142,20 @@ def add_wvt():
     if file_exists:
 	os.remove(outfile)
     hdulist.writeto(outfile)
+
+    # table for GZ2 site database
+    smallcols = []
+    nowvt |= wvtbin == 0
+    yeswvt = N.logical_not(nowvt)
+    smallcols.append(pyfits.Column(name='OBJID', format='K',
+                                   array=d.OBJID[yeswvt]))
+    smallcols.append(pyfits.Column(name='ZBIN', format='I',
+                                   array=zbin[yeswvt]))
+    smallcols.append(pyfits.Column(name='WVTBIN', format='I',
+                                   array=wvtbin[yeswvt]))
+    smallcols.append(pyfits.Column(name='COMPCOUNT', format='I',
+                                   array=0*zbin[yeswvt]))
     tbhdu=pyfits.new_table(smallcols)
-    tbhdu.name = 'WVTBINS'
     outfile = '../dr6_wvt_bins.fits'
     file_exists = os.path.isfile(outfile)
     if file_exists:
