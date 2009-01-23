@@ -7,6 +7,7 @@ from scipy import median
 from scipy.ndimage import median_filter
 import string
 import gc
+import webbrowser
 
 from get_gz2_data import *
 data = gz2data
@@ -26,7 +27,7 @@ pgend()
 
 def selection():
     s = N.zeros(len(data), N.bool)
-    s[:10] = True
+    s[:10000:100] = True
     #run = data.field('run')
     #s = s & (run > 1000) & (run < 5000)
     return s
@@ -177,8 +178,8 @@ def make_imaging_wget_list():
     #print "The password is 'sdss'"
 
 
-def get_jpeg_url(objid):
-    urlformat = 'http://skyservice.pha.jhu.edu/dr6/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=150&height=150'
+def get_jpeg_url(objid, openinbrowser=False):
+    urlformat = 'http://skyservice.pha.jhu.edu/dr6/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=424&height=423'
     select = N.where(data.field('objid') == objid)[0]
     if len(select) < 1:
         #print 'Warning: objid=%s not found!'%(str(objid))
@@ -189,5 +190,13 @@ def get_jpeg_url(objid):
     ra = data.field('ra')[select]
     dec = data.field('dec')[select]
     size = data.field('PETROR90_R')[select]
-    info = {'ra':ra, 'dec':dec, 'scale':pixscale * size / 16.8 * 200./150}
-    return urlformat%info
+    info = {'ra':ra, 'dec':dec, 'scale':size * 0.02}
+    url = urlformat%info
+    if openinbrowser:
+        webbrowser.open(url)
+#   size = data.field('PETROR50_R')[select]
+#     info = {'ra':ra, 'dec':dec, 'scale':pixscale * size * 0.15}
+#     url = urlformat%info
+#     if openinbrowser:
+#         webbrowser.open(url)
+    return url

@@ -3,7 +3,7 @@ DROP TABLE gz2sample_stage1, gz2sample_stage2, gz2sample_stage4,
 gz2sample_stage5, gz2sample_stage6
 
 GO
-DROP VIEW gz2sample_stage3, gz2sample_final, gz2sample_finalcomp
+DROP VIEW gz2sample_stage3, gz2sample_finaldr7, gz2sample_finaldr7comp
 
 -- get required data from PhotoPrimary
 -- reject objects which are flagged as
@@ -145,34 +145,25 @@ GO SELECT COUNT(*) FROM mydb.gz1_sdk50
 
 -- select objects brighter than r = 17 and larger than 3 arcsec
 GO
-CREATE VIEW gz2sample_final1 AS
-SELECT *
-FROM mydb.gz2sample_stage6
-WHERE petroMag_rU <= 17
-AND petroR90_r >= 3
-AND (((redshift > 0.0005) AND (redshift < 0.25)) OR redshift IS NULL)
-AND objid NOT IN (SELECT objid FROM gz1_sdk80)
+SELECT G.*,
+       P.petroMagErr_u, P.petroMagErr_g, P.petroMagErr_r,
+       P.petroMagErr_i, P.petroMagErr_z,
+       P.rowc_u, P.colc_u, P.rowc_g, P.colc_g, P.rowc_r,
+       P.colc_r, P.rowc_i, P.colc_i, P.rowc_z, P.colc_z
+INTO gz2sample_finaldr7
+FROM mydb.gz2sample_stage6 as G, dr7.PhotoPrimary as P
+WHERE G.petroMag_rU <= 17
+AND G.petroR90_r >= 3
+AND (((G.redshift > 0.0005) AND (G.redshift < 0.25)) OR G.redshift IS NULL)
+AND G.objid NOT IN (SELECT G.objid FROM gz1_sdk80)
+AND G.objid = P.objid
 -- DR6: 243064 objects
 
 -- comparative sample is built from a subset of main sample with
 -- redshifts.  Size and luminosity outliers are also excluded later.
 GO
-CREATE VIEW gz2sample_final1comp AS
+CREATE VIEW gz2sample_finaldr7comp AS
 SELECT *
-FROM mydb.gz2sample_final
+FROM mydb.gz2sample_finaldr7
 WHERE redshift IS NOT NULL
 -- DR6:  174269 objects
-
-----------------------------------------------------------------------
--- Get extra information
-----------------------------------------------------------------------
-
-GO
-SELECT P.objid, P.rowc_u, P.colc_u, P.rowc_g, P.colc_g,
-P.rowc_r, P.colc_r, P.rowc_i, P.colc_i, P.rowc_z, P.colc_z,
-F.rowOffset_u, F.colOffset_u, F.rowOffset_g, F.colOffset_g,
-F.rowOffset_r, F.colOffset_r, F.rowOffset_i, F.colOffset_i,
-F.rowOffset_z, F.colOffset_z
-INTO gz2sample_finalextra
-FROM dr7.PhotoObj as P, dr7.Field as F, gz2sample_final1 as G
-WHERE G.objid = P.objid AND P.fieldID = F.fieldID

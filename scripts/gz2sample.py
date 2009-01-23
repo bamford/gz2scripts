@@ -34,8 +34,8 @@ max_magbin = len(N.arange(b[0], b[1], b[2]))-1
 pgend()
 
 def do_all():
-    # starting with gz2sample_final1.fits from CAS
-    # execute run_kcorrect.pro in IDL producing gz2sample_final1_kcorrect.fits
+    # starting with gz2sample_final.fits from CAS
+    # execute gz2_kcorrect.pro in IDL producing gz2sample_final_kcorrect.fits
     add_physical_sizes()
     add_regions()
     check_regions()

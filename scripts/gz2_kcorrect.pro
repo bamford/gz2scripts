@@ -7,9 +7,9 @@ pro gz2_kcorrect
 ; File containing redshifts and 
 ; galactic reddening-corrected SDSS-system ubercal ugriz
 ; luptitude mags and statistical sigma errors
-infilename = '../gz2sample_final1.fits'
+infilename = '../gz2sample_final.fits'
 
-outfilename = '../gz2sample_final1_kcorrect.fits'
+outfilename = '../gz2sample_final_kcorrect.fits'
 
 ; load the fits file. Needs the rsi library installed
 data = mrdfits(infilename,1)
