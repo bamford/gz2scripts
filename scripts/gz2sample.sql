@@ -1,9 +1,9 @@
-GO
-DROP TABLE gz2sample_stage1, gz2sample_stage2, gz2sample_stage4,
-gz2sample_stage5, gz2sample_stage6
+--GO
+--DROP TABLE gz2sample_stage1, gz2sample_stage2, gz2sample_stage4,
+--gz2sample_stage5, gz2sample_stage6
 
-GO
-DROP VIEW gz2sample_stage3, gz2sample_finaldr7, gz2sample_finaldr7comp
+--GO
+--DROP VIEW gz2sample_stage3, gz2sample_finaldr7, gz2sample_finaldr7comp
 
 -- get required data from PhotoPrimary
 -- reject objects which are flagged as
@@ -15,7 +15,9 @@ objID, run, rerun, camcol, field, obj, ra, dec, petroR50_r, petroR90_r,
 petroMag_u, petroMag_g, petroMag_r, petroMag_i, petroMag_z,
 petroMagErr_u, petroMagErr_g, petroMagErr_r, petroMagErr_i, petroMagErr_z,
 psfMag_r, fiberMag_r, deVMag_r, deVMagErr_r, expMag_r, expMagErr_r, fracDeV_r,
-(petroMag_r + 2.5*log10(6.283185*power(petroR50_r, 2))) as mu50_r
+(petroMag_r + 2.5*log10(6.283185*power(petroR50_r, 2))) as mu50_r,
+rowc_u, colc_u, rowc_g, colc_g, rowc_r,
+colc_r, rowc_i, colc_i, rowc_z, colc_z
 INTO gz2sample_stage1
 FROM dr7.PhotoPrimary
 WHERE (petroMag_r < 17.9) AND (psfMag_r - petroMag_r > 0.15)
@@ -34,6 +36,9 @@ dbo.calc_cmodelerr(deVMagErr_r, expMagErr_r, deVMag_r, expMag_r,
 INTO gz2sample_stage2
 FROM mydb.gz2sample_stage1
 
+GO
+DROP TABLE gz2sample_stage1
+
 -- perform star-galaxy separation
 GO
 CREATE VIEW gz2sample_stage3 AS
@@ -42,34 +47,19 @@ FROM mydb.gz2sample_stage2
 WHERE (psfMag_r - cmodelMag_r >= 0.24)
 -- DR6: 778358 objects
 
--- perform Ubercal correction
-GO
---SELECT G.objID, run, rerun, camcol, field, obj, ra, dec,
---G.petroR50_r, petroR90_r,
-SELECT G.*,
-G.petroMag_u + U.conv_u as petroMag_uU,
-G.petroMag_g + U.conv_g as petroMag_gU,
-G.petroMag_r + U.conv_r as petroMag_rU,
-G.petroMag_i + U.conv_i as petroMag_iU,
-G.petroMag_z + U.conv_z as petroMag_zU,
-G.cmodelMag_r + U.conv_r as cmodelMag_rU,
-G.fiberMag_r + U.conv_r as fiberMag_rU,
-G.mu50_r + U.conv_r as mu50_rU
-INTO gz2sample_stage4
-FROM mydb.gz2sample_stage3 as G, dr7.Ubercal as U
-WHERE G.objID = U.objID
+-- Ubercal correction no longer required - dr7 default is ubercal
 
 -- perform magnitude cut 
 -- perform surface brightness cut
 GO
 SELECT *
 INTO gz2sample_stage5
-FROM mydb.gz2sample_stage4
-WHERE (petroMag_rU <= 17.77)
-AND (mu50_rU <= 23.0)
+FROM mydb.gz2sample_stage3
+WHERE (petroMag_r <= 17.77)
+AND (mu50_r <= 23.0)
 -- OPTIONALLY to better match mgs sample for testing:
 -- include all low SB galaxies with sufficiently bright fiber mags
--- OR (fiberMag_rU <= 19.0))
+-- OR (fiberMag_r <= 19.0))
 -- DR6: 652803 objects
 
 -- add redshifts to table where available
@@ -85,6 +75,9 @@ FROM
 ) AS X
 INTO gz2sample_stage6
 WHERE best = 1
+
+GO
+DROP TABLE gz2sample_stage5
 
 ----------------------------------------------------------------------
 -- Determine effect of various potential further cuts to the sample
@@ -116,12 +109,12 @@ WHERE petroR90_r < 5.0
 
 -- count objects fainter than r = 17.0
 GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
-WHERE petroMag_rU > 17.0
+WHERE petroMag_r > 17.0
 -- DR6: 398650 objects (61.1%)
 
 -- count objects fainter than r = 16.5
 GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
-WHERE petroMag_rU > 16.5
+WHERE petroMag_r > 16.5
 -- DR6: 516206 objects (79.1%)
 
 -- count objects classified as star / don't know 
@@ -145,18 +138,13 @@ GO SELECT COUNT(*) FROM mydb.gz1_sdk50
 
 -- select objects brighter than r = 17 and larger than 3 arcsec
 GO
-SELECT G.*,
-       P.petroMagErr_u, P.petroMagErr_g, P.petroMagErr_r,
-       P.petroMagErr_i, P.petroMagErr_z,
-       P.rowc_u, P.colc_u, P.rowc_g, P.colc_g, P.rowc_r,
-       P.colc_r, P.rowc_i, P.colc_i, P.rowc_z, P.colc_z
+SELECT *
 INTO gz2sample_finaldr7
-FROM mydb.gz2sample_stage6 as G, dr7.PhotoPrimary as P
-WHERE G.petroMag_rU <= 17
-AND G.petroR90_r >= 3
-AND (((G.redshift > 0.0005) AND (G.redshift < 0.25)) OR G.redshift IS NULL)
-AND G.objid NOT IN (SELECT G.objid FROM gz1_sdk80)
-AND G.objid = P.objid
+FROM mydb.gz2sample_stage6
+WHERE petroMag_r <= 17
+AND petroR90_r >= 3
+AND (((redshift > 0.0005) AND (redshift < 0.25)) OR redshift IS NULL)
+AND objid NOT IN (SELECT objid FROM gz1_sdk80)
 -- DR6: 243064 objects
 
 -- comparative sample is built from a subset of main sample with

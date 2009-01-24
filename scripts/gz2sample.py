@@ -50,7 +50,7 @@ def notNaN(x):
     return (x > 0.0) | (x <= 0.0)
 
 def add_physical_sizes():
-    p = pyfits.open(data_path+'gz2sample_final1_kcorrect.fits')
+    p = pyfits.open(data_path+'gz2sample_final_kcorrect.fits')
     d = p[1].data
     r50_arcsec = d.field('petroR50_r')
     redshift = d.field('redshift')
@@ -69,7 +69,7 @@ def add_physical_sizes():
 			      array=r50_kpc))
     tbhdu=pyfits.new_table(cols)
     tbhdu.name = 'data'
-    outfile = data_path+'gz2sample_final1_abs.fits'
+    outfile = data_path+'gz2sample_final_abs.fits'
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
@@ -78,7 +78,7 @@ def add_physical_sizes():
 
 def add_regions():
     # get data
-    p = pyfits.open(data_path+'gz2sample_final1_abs.fits')
+    p = pyfits.open(data_path+'gz2sample_final_abs.fits')
     data = p[1].data
     ra = data.field('RA')
     dec = data.field('DEC')
@@ -127,7 +127,7 @@ def add_regions():
 			      array=region))
     tbhdu=pyfits.new_table(cols)
     tbhdu.name = 'data'
-    outfile = data_path+'gz2sample_final1_abs_regions.fits'
+    outfile = data_path+'gz2sample_final_abs_regions.fits'
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
@@ -137,7 +137,7 @@ def add_regions():
 
 def check_regions():
     # get data
-    data = pyfits.getdata(data_path+'gz2sample_final1_abs_regions.fits')
+    data = pyfits.getdata(data_path+'gz2sample_final_abs_regions.fits')
     ra = data.field('RA')
     dec = data.field('DEC')
     n = len(ra)
@@ -210,7 +210,7 @@ def ra_dec_to_lambda_eta(ra, dec):
     return lam, eta
 
 def add_bins():
-    p = pyfits.open(data_path+'gz2sample_final1_abs_regions.fits')
+    p = pyfits.open(data_path+'gz2sample_final_abs_regions.fits')
     d = p['data'].data
     redshift = d.field('redshift')
     zmask = notNaN(redshift)
@@ -254,7 +254,7 @@ def add_bins():
 	tbhdu=pyfits.new_table(c)
         tbhdu.name = '%s_simple_bins'%k
 	hdulist.append(tbhdu)
-        outfile = data_path+'gz2sample_final1_abs_regions_bins.fits'
+        outfile = data_path+'gz2sample_final_abs_regions_bins.fits'
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
@@ -263,7 +263,7 @@ def add_bins():
 
 def add_bin_counts():
     # Determine counts in each mag, size and z bin
-    infile = data_path+'gz2sample_final1_abs_regions_bins.fits'
+    infile = data_path+'gz2sample_final_abs_regions_bins.fits'
     p = pyfits.open(infile)
     data = p['data'].data
     # determine bins
@@ -310,7 +310,7 @@ def add_bin_counts():
     hdu = pyfits.ImageHDU(n) 
     hdu.name = 'simple_bin_counts'
     p.append(hdu)
-    outfile = data_path+'gz2sample_final1_abs_regions_counts.fits'
+    outfile = data_path+'gz2sample_final_abs_regions_counts.fits'
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
@@ -349,7 +349,7 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
     nodes[1] = (nodes[1] + 0.5) * bin_step + bin_min
     bin_min, bin_max, bin_step = bins['petroR50_r_kpc']
     nodes[0] = (nodes[0] + 0.5) * bin_step + bin_min
-    f = data_path+'gz2sample_final1_abs_regions_counts.fits'
+    f = data_path+'gz2sample_final_abs_regions_counts.fits'
     p = pyfits.open(f)
     zbins = p['redshift_simple_bins'].data
     magbins = p['petroMag_MrU_simple_bins'].data
@@ -390,7 +390,7 @@ def hires(x):
 def add_wvt():
     fwvt = wvt_path+'gz2_wvt_bins.fits'
     wvt = pyfits.getdata(fwvt)
-    f = data_path+'gz2sample_final1_abs_regions_counts.fits'
+    f = data_path+'gz2sample_final_abs_regions_counts.fits'
     p = pyfits.open(f)
     d = p['data'].data
     zbin = d.field('redshift_simple_bin')
@@ -424,7 +424,7 @@ def add_wvt():
     for ip in p[1:]:
         if ip.name.lower() != 'data':
             hdulist.append(ip)
-    outfile = data_path+'gz2sample_final1_abs_regions_counts_wvt.fits'
+    outfile = data_path+'gz2sample_final_abs_regions_counts_wvt.fits'
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
@@ -432,7 +432,7 @@ def add_wvt():
 
 def make_db_table():
     # table for GZ2 site database
-    f = data_path+'gz2sample_final1_abs_regions_counts_wvt.fits'
+    f = data_path+'gz2sample_final_abs_regions_counts_wvt.fits'
     p = pyfits.open(f)
     d = p['data'].data
     n = len(d)
@@ -460,7 +460,7 @@ def make_db_table():
 
 def make_db_table2():
     # table for GZ2 site database which matches old table columns
-    f = data_path+'gz2sample_final1_abs_regions_counts_wvt.fits'
+    f = data_path+'gz2sample_final_abs_regions_counts_wvt.fits'
     p = pyfits.open(f)
     d = p['data'].data
     n = len(d)
