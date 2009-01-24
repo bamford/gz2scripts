@@ -5,8 +5,8 @@ pro gz2_kcorrect
 ; .r   gz2_kcorrect
 
 ; File containing redshifts and 
-; galactic reddening-corrected SDSS-system ubercal ugriz
-; luptitude mags and statistical sigma errors
+; galactic SDSS-system ubercal ugriz luptitude mags,
+; statistical sigma errors and extinction corrections
 infilename = '../gz2sample_final.fits'
 
 outfilename = '../gz2sample_final_kcorrect.fits'
@@ -15,8 +15,9 @@ outfilename = '../gz2sample_final_kcorrect.fits'
 data = mrdfits(infilename,1)
 
 ; make tag names
-mag = 'PETROMAG_'+['U','G','R','I','Z']+'U'
+mag = 'PETROMAG_'+['U','G','R','I','Z']
 magerr = 'PETROMAGERR_'+['U','G','R','I','Z']
+extinction = 'EXTINCTION_'+['U','G','R','I','Z']
 ; name to store into
 absmag = 'PETROMAG_M'+['U','G','R','I','Z']+'U'
 absmagerr = 'PETROMAGERR_M'+['U','G','R','I','Z']
@@ -35,7 +36,8 @@ magerrarr = fltarr(nmag, ngal)
 
 ; populate magnitude arrays
 for m=0, nmag-1 do begin
-   magarr[m,*] = data.(where(TAG_NAMES(data) eq mag[m]))
+   magarr[m,*] = data.(where(TAG_NAMES(data) eq mag[m])) $
+                 - data.(where(TAG_NAMES(data) eq extinction[m]))
    magerrarr[m,*] = data.(where(TAG_NAMES(data) eq magerr[m]))
 endfor
 

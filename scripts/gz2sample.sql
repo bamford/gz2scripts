@@ -16,11 +16,12 @@ petroMag_u, petroMag_g, petroMag_r, petroMag_i, petroMag_z,
 petroMagErr_u, petroMagErr_g, petroMagErr_r, petroMagErr_i, petroMagErr_z,
 psfMag_r, fiberMag_r, deVMag_r, deVMagErr_r, expMag_r, expMagErr_r, fracDeV_r,
 (petroMag_r + 2.5*log10(6.283185*power(petroR50_r, 2))) as mu50_r,
+extinction_u, extinction_g, extinction_r, extinction_i, extinction_z,
 rowc_u, colc_u, rowc_g, colc_g, rowc_r,
 colc_r, rowc_i, colc_i, rowc_z, colc_z
 INTO gz2sample_stage1
 FROM dr7.PhotoPrimary
-WHERE (petroMag_r < 17.9) AND (psfMag_r - petroMag_r > 0.15)
+WHERE petroMag_r < 17.9 AND (psfMag_r - petroMag_r > 0.15)
 AND ((flags_r & 0x70000000) > 0) --BINNED1 OR BINNED2 OR BINNED4
 AND ((flags_r & 0x40000) = 0) --NOT SATURATED
 AND ((flags_r & 0x2) = 0) --NOT BRIGHT
@@ -141,7 +142,7 @@ GO
 SELECT *
 INTO gz2sample_finaldr7
 FROM mydb.gz2sample_stage6
-WHERE petroMag_r <= 17
+WHERE (petroMag_r - extinction_r) <= 17
 AND petroR90_r >= 3
 AND (((redshift > 0.0005) AND (redshift < 0.25)) OR redshift IS NULL)
 AND objid NOT IN (SELECT objid FROM gz1_sdk80)
