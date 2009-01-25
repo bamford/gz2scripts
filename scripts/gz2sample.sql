@@ -1,9 +1,9 @@
 --GO
---DROP TABLE gz2sample_stage1, gz2sample_stage2, gz2sample_stage4,
---gz2sample_stage5, gz2sample_stage6
+--DROP TABLE gz2sample_stage1, gz2sample_stage2,
+--           gz2sample_stage3, gz2sample_stage4
 
 --GO
---DROP VIEW gz2sample_stage3, gz2sample_finaldr7, gz2sample_finaldr7comp
+--DROP VIEW gz2sample_finaldr7comp
 
 -- get required data from PhotoPrimary
 -- reject objects which are flagged as
@@ -41,27 +41,21 @@ GO
 DROP TABLE gz2sample_stage1
 
 -- perform star-galaxy separation
-GO
-CREATE VIEW gz2sample_stage3 AS
-SELECT *
-FROM mydb.gz2sample_stage2
-WHERE (psfMag_r - cmodelMag_r >= 0.24)
--- DR6: 778358 objects
-
--- Ubercal correction no longer required - dr7 default is ubercal
-
 -- perform magnitude cut 
 -- perform surface brightness cut
 GO
 SELECT *
-INTO gz2sample_stage5
-FROM mydb.gz2sample_stage3
-WHERE (petroMag_r <= 17.77)
+INTO gz2sample_stage3
+FROM mydb.gz2sample_stage2
+WHERE (psfMag_r - cmodelMag_r >= 0.24)
+AND (petroMag_r <= 17.77)
 AND (mu50_r <= 23.0)
 -- OPTIONALLY to better match mgs sample for testing:
 -- include all low SB galaxies with sufficiently bright fiber mags
 -- OR (fiberMag_r <= 19.0))
 -- DR6: 652803 objects
+
+-- Note Ubercal correction no longer required - dr7 default is ubercal
 
 -- add redshifts to table where available
 -- excluding duplicates
@@ -71,50 +65,50 @@ FROM
 (
     SELECT G.*, S.z as redshift, S.zErr as redshiftErr,
     ROW_NUMBER() OVER(PARTITION BY G.objid ORDER BY S.zErr) AS best
-    FROM mydb.gz2sample_stage5 as G
+    FROM mydb.gz2sample_stage3 as G
     LEFT JOIN dr7.SpecObj as S on (S.bestObjID = G.objID)
 ) AS X
-INTO gz2sample_stage6
+INTO gz2sample_stage4
 WHERE best = 1
 
 GO
-DROP TABLE gz2sample_stage5
+DROP TABLE gz2sample_stage3
 
 ----------------------------------------------------------------------
 -- Determine effect of various potential further cuts to the sample
 ----------------------------------------------------------------------
 
 -- count objects with a redshift which implies it is in our own Galaxy
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE redshift < 0.0005
 -- DR6: 5331 objects (0.8%)
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE redshift < 0.001
 -- DR6: 5409 objects (0.8%)
 
 -- count objects with a redshift which implies
 -- it is too distant for useful classification
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE redshift > 0.25
 -- DR6: 4130 objects (0.6%)
 
 -- count objects smaller than 3 arcsec
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE petroR90_r < 3.0
 -- DR6: 21640 objects (3.3%)
 
 -- count objects smaller than 5 arcsec
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE petroR90_r < 5.0
 -- DR6: 195676 objects (30.0%)
 
 -- count objects fainter than r = 17.0
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE petroMag_r > 17.0
 -- DR6: 398650 objects (61.1%)
 
 -- count objects fainter than r = 16.5
-GO SELECT COUNT(*) FROM mydb.gz2sample_stage6
+GO SELECT COUNT(*) FROM mydb.gz2sample_stage4
 WHERE petroMag_r > 16.5
 -- DR6: 516206 objects (79.1%)
 
@@ -141,7 +135,7 @@ GO SELECT COUNT(*) FROM mydb.gz1_sdk50
 GO
 SELECT *
 INTO gz2sample_finaldr7
-FROM mydb.gz2sample_stage6
+FROM mydb.gz2sample_stage4
 WHERE (petroMag_r - extinction_r) <= 17
 AND petroR90_r >= 3
 AND (((redshift > 0.0005) AND (redshift < 0.25)) OR redshift IS NULL)
