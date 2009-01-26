@@ -18,6 +18,7 @@ AND (((flags_r & 0x8) = 0) OR (flags_r & 0x40) > 0) --(NOT BLENDED OR NODEBLEND)
 AND (P.fieldID = F.fieldID)
 AND (F.InLegacy = 1)
 -- DR6: 798683 objects
+-- DR7: 727367 objects
 
 -- get required data from PhotoPrimary
 -- reject objects which are flagged as
@@ -39,7 +40,7 @@ WHERE G.objid = P.objid
 
 -- calculate cmodel mags
 GO
-SELECT
+SELECT objid,
 dbo.calc_cmodel(deVMag_r, expMag_r, fracDev_r, 1.2e-10) as cmodelMag_r,
 dbo.calc_cmodelerr(deVMagErr_r, expMagErr_r, deVMag_r, expMag_r,
     fracDev_r, 1.2e-10) as cmodelMagErr_r
@@ -50,16 +51,18 @@ FROM mydb.gz2sample_stage1_legacy
 -- perform magnitude cut 
 -- perform surface brightness cut
 GO
-CREATE VIEW gz2sample_stage3_legacy AS
 SELECT S1.*, S2.*
+INTO gz2sample_stage3_legacy
 FROM gz2sample_stage1_legacy as S1, gz2sample_stage2_legacy as S2
 WHERE (psfMag_r - cmodelMag_r >= 0.24)
 AND (petroMag_r <= 17.77)
 AND (mu50_r <= 23.0)
+AND S1.objid = S2.objid
 -- OPTIONALLY to better match mgs sample for testing:
 -- include all low SB galaxies with sufficiently bright fiber mags
 -- OR (fiberMag_r <= 19.0))
 -- DR6: 652803 objects
+-- DR7: 594370 objects
 
 -- Note Ubercal correction no longer required - dr7 default is ubercal
 
@@ -144,6 +147,7 @@ AND petroR90_r >= 3
 AND (((redshift > 0.0005) AND (redshift < 0.25)) OR redshift IS NULL)
 AND objid NOT IN (SELECT objid FROM gz1_sdk80)
 -- DR6: 243064 objects
+-- DR7: 245609 objects
 
 -- comparative sample is built from a subset of main sample with
 -- redshifts.  Size and luminosity outliers are also excluded later.
@@ -153,3 +157,4 @@ SELECT *
 FROM mydb.gz2sample_finaldr7_legacy
 WHERE redshift IS NOT NULL
 -- DR6:  174269 objects
+-- DR7:  211922 objects
