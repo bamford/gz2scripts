@@ -18,7 +18,7 @@ data_path = '/Users/spb/Work/projects/GalaxyZoo2/'
 wvt_path = data_path
 
 bins = {'redshift': (0.01, 0.15, 0.01),
-        'petroMag_MrU': (-24.0, -15.0, 0.05),
+        'petroMag_Mr': (-24.0, -15.0, 0.05),
         'petroR50_r_kpc': (0.0, 15.0, 0.1)}
 
 min_zbin = 0
@@ -28,8 +28,12 @@ min_sizebin = 0      # MUST BE ZERO
 b = bins['petroR50_r_kpc']
 max_sizebin = len(N.arange(b[0], b[1], b[2]))-1
 min_magbin = 0       # MUST BE ZERO
-b = bins['petroMag_MrU']
+b = bins['petroMag_Mr']
 max_magbin = len(N.arange(b[0], b[1], b[2]))-1
+
+# region divisions
+lamdivide = [-90, -30, 0, 30, 90]
+etadivide = [-90, 0, 90]
 
 pgend()
 
@@ -88,19 +92,17 @@ def add_regions():
     print 'Calculating survey coords'
     lam, eta = ra_dec_to_lambda_eta(ra, dec)
     # divide
-    lamdivide = [-90, -23, 2, 27, 90]
-    etadivide = [-90, 5, 180]
     region = N.zeros(n)
     pgopen(plots_path + 'gz2_regions.ps/cps')
     pgsetup()
-    pgenv(-90, 90, -90, 180)
+    pgenv(lamdivide[0], lamdivide[-1], etadivide[0], etadivide[-1])
     pglab('lambda', 'eta', '') 
     pgsch(0.1)
     pgxsci('red') 
     pgxpt(lam[::10], eta[::10], 'dot')
     pgxsci('black')
     for l in lamdivide:
-        pgline(N.array([l, l]), N.array([-90, 180]))
+        pgline(N.array([l, l]), N.array([-180, 180]))
     for e in etadivide:
         pgline(N.array([-90, 90]), N.array([e, e]))
     pgsch(0.8*ch)
@@ -146,12 +148,10 @@ def check_regions():
     print 'Calculating survey coords'
     lam, eta = ra_dec_to_lambda_eta(ra, dec)
     # divide
-    lamdivide = [-90, -23, 2, 27, 90]
-    etadivide = [-90, 5, 180]
     region = data.field('region')
     pgopen(plots_path + 'gz2_regions_check.ps/cps')
     pgsetup()
-    pgenv(-90, 90, -90, 180)
+    pgenv(lamdivide[0], lamdivide[-1], etadivide[0], etadivide[-1])
     pglab('lambda', 'eta', '') 
     pgsch(0.1)
     pgxsci('red')
@@ -232,7 +232,7 @@ def add_bins():
         xbinz[low] = -999
         xbinz[high] = 999
         xbin[zmask] = xbinz
-        name = '%s_simple_bin'%k
+        name = ('%s_simple_bin'%k).upper()
         cols.append(pyfits.Column(name=name,
                                   format='I', array=xbin))
         bin = N.arange(0, maxbin, 1)
@@ -269,7 +269,7 @@ def add_bin_counts():
     # determine bins
     zbins = p['redshift_simple_bins'].data.field('bin')
     n_zbins = len(zbins)
-    magbins = p['petroMag_MrU_simple_bins'].data.field('bin')
+    magbins = p['petroMag_Mr_simple_bins'].data.field('bin')
     n_magbins = len(magbins)
     sizebins = p['petroR50_r_kpc_simple_bins'].data.field('bin')
     n_sizebins = len(sizebins)
@@ -299,7 +299,7 @@ def add_bin_counts():
         d_z = data[z_selection]
         gc.collect()
         for imag in magbins:
-            mag_selection = d_z.field('petroMag_MrU_simple_bin') == imag
+            mag_selection = d_z.field('petroMag_Mr_simple_bin') == imag
             if not N.any(mag_selection):  continue
             d_mag = d_z[mag_selection]
             for isize in sizebins:
@@ -321,7 +321,7 @@ def plot_all_wvt():
     fname = 'gz2_wvt_bins'
     fd = wvt_path+fname+'.fits'
     nz = pyfits.getval(fd, 'NAXIS3')
-    print nz
+    print 'nz:', nz
     for fname in ['gz2_wvt_bins', 'gz2_wvt_counts_all']:
         for iz in range(nz):
             plot_wvt(iz, fname)
@@ -335,7 +335,7 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
     d = d[zbin, min_magbin:max_magbin+1,
           min_sizebin:max_sizebin+1]
     d = d.transpose()
-    print d.sum()
+    #print d.sum()
     if logplot:
         mask = d <= 0.0
         d[mask] = 1.0
@@ -345,14 +345,14 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
     nodes = pyfits.getdata(fn)
     nodes = nodes[zbin]
     nodes = nodes[:,(nodes[0] > 0.001) & (nodes[1] > 0.001)]    
-    bin_min, bin_max, bin_step = bins['petroMag_MrU']
+    bin_min, bin_max, bin_step = bins['petroMag_Mr']
     nodes[1] = (nodes[1] + 0.5) * bin_step + bin_min
     bin_min, bin_max, bin_step = bins['petroR50_r_kpc']
     nodes[0] = (nodes[0] + 0.5) * bin_step + bin_min
     f = data_path+'gz2sample_final_abs_regions_counts.fits'
     p = pyfits.open(f)
     zbins = p['redshift_simple_bins'].data
-    magbins = p['petroMag_MrU_simple_bins'].data
+    magbins = p['petroMag_Mr_simple_bins'].data
     sizebins = p['petroR50_r_kpc_simple_bins'].data
     pgend()
     fplot = fname+'_zbin_%i.ps'%zbin
@@ -370,7 +370,7 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
         pgimag_s(hires(d), fg_count, bg_count)
     else:
         pgimag_s(hires(d), d.max()*1.05, d.min()*0.9)
-    print d.max(), d.min()
+    #print d.max(), d.min()
     pgbox('BCN', 0, 0, 'BCN', 0, 0)
     pgxsci('white')
     pgxpt(nodes[1], nodes[0], 'point')
@@ -397,7 +397,7 @@ def add_wvt():
     nowvt = (zbin > max_zbin) | (zbin < min_zbin)
     zbin = N.where(zbin > max_zbin, max_zbin, zbin)
     zbin = N.where(zbin < min_zbin, min_zbin, zbin)
-    magbin = d.field('petroMag_MrU_simple_bin')
+    magbin = d.field('petroMag_Mr_simple_bin')
     nowvt |= (magbin > max_magbin) | (magbin < min_magbin)
     magbin = N.where(magbin > max_magbin, max_magbin, magbin)
     magbin = N.where(magbin < min_magbin, min_magbin, magbin)
@@ -440,16 +440,17 @@ def make_db_table():
     cols = []
     for c in oldcols:
 	name = c.name.upper()
-        if name in ['OBJID', 'RA', 'DEC', 'REDSHIFT', 'PETROR90_R',
-                    'REGION', 'REDSHIFT_SIMPLE_BIN', 'WVT_BIN']:
+        if name in ['OBJID', 'RA', 'DEC', 'PETROR90_R', 'REGION',
+                    'REDSHIFT_SIMPLE_BIN', 'WVT_BIN']:
             name = name.replace('PETROR90_R', 'SIZE')
             name = name.replace('_SIMPLE', '')
+            name = name.replace('WVT_', 'MAGSIZE_')
             cols.append(pyfits.Column(name=name, format=c.format,
                                       array=d.field(c.name)))
-    cols.append(pyfits.Column(name='CLASSCOUNT', format='I',
-                                   array=N.zeros(n)))
-    cols.append(pyfits.Column(name='COMPCOUNT', format='I',
-                                   array=N.zeros(n)))
+    #cols.append(pyfits.Column(name='CLASSCOUNT', format='I',
+    #                               array=N.zeros(n)))
+    #cols.append(pyfits.Column(name='COMPCOUNT', format='I',
+    #                               array=N.zeros(n)))
     tbhdu=pyfits.new_table(cols)
     tbhdu.name = 'data'
     outfile = data_path+'gz2sample_db.fits'

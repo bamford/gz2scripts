@@ -19,7 +19,7 @@ mag = 'PETROMAG_'+['U','G','R','I','Z']
 magerr = 'PETROMAGERR_'+['U','G','R','I','Z']
 extinction = 'EXTINCTION_'+['U','G','R','I','Z']
 ; name to store into
-absmag = 'PETROMAG_M'+['U','G','R','I','Z']+'U'
+absmag = 'PETROMAG_M'+['U','G','R','I','Z']
 absmagerr = 'PETROMAGERR_M'+['U','G','R','I','Z']
 
 ; constants

@@ -2,7 +2,7 @@ PRO WVT_GZ2
   ;Perform WVT binning on Galaxy Zoo 2 data to constant counts per bin
   counts_per_bin = 200
   ;Read in the counts image 
-  data=mrdfits('../gz2sample_final1_abs_regions_counts.fits', $
+  data=mrdfits('../gz2sample_final_abs_regions_counts.fits', $
                    'simple_bin_counts') 
   dim = size(data, /dimensions)
   binnedimage = fltarr(dim)
