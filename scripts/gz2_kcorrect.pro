@@ -113,8 +113,8 @@ for m=0, nmag-1 do begin
 endfor
 
 ; create new array of structures including absmag tags
-absmagstruct = {ABSGAL, petroMag_MuU:0.0, petroMag_MgU:0.0, $
-                petroMag_MrU:0.0, petroMag_MiU:0.0, petroMag_MzU:0.0, $
+absmagstruct = {ABSGAL, petroMag_Mu:0.0, petroMag_Mg:0.0, $
+                petroMag_Mr:0.0, petroMag_Mi:0.0, petroMag_Mz:0.0, $
                 petroMagErr_Mu:0.0, petroMagErr_Mg:0.0, $
                 petroMagErr_Mr:0.0, petroMagErr_Mi:0.0, $
                 petroMagErr_Mz:0.0}

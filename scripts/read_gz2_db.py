@@ -1,15 +1,15 @@
 import pyfits
 import xml.parsers.expat
 import os
-import time
+import datetime
 import string
 
-from get_gz2_data import *
+#from get_gz2_data import *
 
 dbfilename = '/Users/spb/Work/projects/GalaxyZoo2/data/ClassificationGZ2.csv'
 fitsfilename = dbfilename.replace('.csv', '.fits')
     
-def read_gz2_db():
+def read_gz2_db(sample=None):
     # Set up XML parser
     print 'Setting up XML parser'
     class XMLParserFuncs:
@@ -39,6 +39,7 @@ def read_gz2_db():
                 self.compobjid = data
             elif self.inelement('answer') or self.inelement('companswer'):
                 self.answertext = data
+                qaclassindex.append(index)
                 qaclassid.append(id)
                 questions.append(self.questiontext)
                 answers.append(self.answertext)
@@ -50,6 +51,7 @@ def read_gz2_db():
     # Read database dump file
     print 'Reading database dump file'
     f = file(dbfilename)
+    classindex = []
     classid = []
     objid = []
     username = []
@@ -57,10 +59,17 @@ def read_gz2_db():
     date = []
     transformation = []
     compobjid = []
+    qaclassindex = []
     qaclassid = []
     questions = []
     answers = []
-    for l in f:
+    index = -1
+    for li, l in enumerate(f):
+        if li%10000 == 0:
+            print li
+        if sample is not None:
+            if li%sample != 0:
+                continue
         l = l.decode('windows-1252')
         l = l.encode('utf-8', 'ignore')
         l = l.replace('\x00', '')
@@ -76,15 +85,24 @@ def read_gz2_db():
         ls = l[s+1:].split(',')
         if ls[0] == '':
             continue
+        classtime = (ls[3].replace('-', ' ')
+                     .replace(':', ' ')
+                     .replace('.', ' ').split())
+        classtime = [int(float(i)) for i in classtime]
+        year, month, day, hour, min, sec, msec = classtime
+        classtime = datetime.datetime(year, month, day, hour, min, sec, msec)
+        start = datetime.datetime(2008, 10, 03)
+        if classtime < start:
+            continue
         objid.append(long(ls[0]))
         username.append(ls[1])
         date.append(ls[3])
         expertise.append(int(ls[2]))
         transformation.append(ls[6])
         id = long(ls[4])
+        index += 1
         classid.append(id)
-        if int(id)%1000 == 0:
-            print id
+        classindex.append(index)
         p = xml.parsers.expat.ParserCreate()
         p.StartElementHandler = xp.start_element
         p.EndElementHandler = xp.end_element
@@ -102,7 +120,8 @@ def read_gz2_db():
     p.append(pyfits.PrimaryHDU())
 
     # Create Classifications table
-    cols = [pyfits.Column(name='classid', format='J', array=classid),
+    cols = [pyfits.Column(name='classindex', format='J', array=classindex),
+            pyfits.Column(name='classid', format='J', array=classid),
             pyfits.Column(name='objid', format='K', array=objid),
             pyfits.Column(name='username', format='128A', array=username),
             pyfits.Column(name='expertise', format='I', array=expertise),
@@ -115,7 +134,8 @@ def read_gz2_db():
     p.append(classifications)
 
     # Get QandA table, or create if not present
-    cols = [pyfits.Column(name='classid', format='J', array=qaclassid),
+    cols = [pyfits.Column(name='classindex', format='J', array=qaclassindex),
+            pyfits.Column(name='classid', format='J', array=qaclassid),
             pyfits.Column(name='question', format='128A', array=questions),
             pyfits.Column(name='answer', format='128A', array=answers)]
     qanda = pyfits.new_table(cols)
@@ -123,6 +143,10 @@ def read_gz2_db():
     p.append(qanda)
 
     # Write file
-    if os.path.exists(fitsfilename):
-        os.remove(fitsfilename)
-    p.writeto(fitsfilename)
+    if sample is not None:
+        fn = fitsfilename.replace('.fits', '_sample%i.fits'%sample)
+    else:
+        fn = fitsfilename
+    if os.path.exists(fn):
+        os.remove(fn)
+    p.writeto(fn)

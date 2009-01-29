@@ -35,103 +35,199 @@ def tutorial_features():
 # 587731172767498868 3
 
 def get_questions():
-    questions = find_unique(qanda.field('question'))
-    questions.sort()
-    print questions
+    questions, counts = find_unique(qanda.field('question'), count=True)
+    s = questions.argsort()
+    print s
+    questions = questions[s]
+    counts = counts[s]
+    for i in range(len(questions)):
+        print '%-65s %i'%(questions[i], counts[i])
+    return questions
 
-questions = ['Could this be a disk viewed edge-on?',
-             'Does the galaxy have a bulge at its center? If so what shape',
-             'How many spiral arms are there?',
-             'How prominent is the bulge?',
-             'How rounded is it?',
-             'How tightly wound do the spiral arms appear?',
-             'Is the galaxy simply smooth and rounded, with no sign of a disk?',
-          'Is the odd feature a ring, or is the galaxy disturbed or irregular?',
-          'Is there a sign of a bar feature through the centre of the galaxy?',
-          'Is there any sign of a spiral arm pattern?',
-             'Is there anything odd?']
+questions = [
+       'Is the galaxy simply smooth and rounded, with no sign of a disk?',
+       'How rounded is it?',
+       'Could this be a disk viewed edge-on?',
+       'How prominent is the bulge?',
+       'Does the galaxy have a bulge at its centre?  If  so, what shape?',
+       'Is there any sign of a spiral arm pattern?',
+       'How tightly wound do the spiral arms appear?',
+       'How many spiral arms are there?',
+       'Is there a sign of a bar feature through the centre of the galaxy?',
+       'Is there anything odd?',
+       'Is the odd feature a ring, or is the galaxy disturbed or irregular?']
 
 def get_answers():
     answers = {}
     for q in questions:
+        print q
         select = qanda.field('question') == q
-        a = find_unique(qanda.field('answer')[select])
-        a.sort()
+        a, counts = find_unique(qanda.field('answer')[select], count=True)
+        s = a.argsort()
+        a = a[s]
+        counts = counts[s]
+        s = N.array([i.strip()[:2] != '58' for i in a])
+        a = a[s]
+        counts = counts[s]
         answers[q] = a.tolist()
-    print answers
+        for i in range(len(a)):
+            print '   %40s %i'%(a[i], counts[i])
+    return answers
 
-answers = {'Is the galaxy simply smooth and rounded, with no sign of a disk?':
-               ['Features or disk', 'Smooth', 'Star or artifact'],
-           'Does the galaxy have a bulge at its center? If so what shape':
-               ['Boxy', 'No Bulge', 'Rounded'],
+answers = {'Is there anything odd?':
+               ['No', 'Yes'],
+           'Is the galaxy simply smooth and rounded, with no sign of a disk?':
+               ['Features or Disk', 'Smooth', 'Star or Artifact'],
+           'Is there any sign of a spiral arm pattern?':
+               ['No Spiral', 'Spiral'],
            'How tightly wound do the spiral arms appear?':
                ['Loose', 'Medium', 'Tight'],
          'Is the odd feature a ring, or is the galaxy disturbed or irregular?':
-           ['Disturbed', 'Irregular', 'Lens or arc', 'Merger', 'Other', 'Ring'],
-         'Is there a sign of a bar feature through the centre of the galaxy?':
+               ['Disturbed', 'Irregular', 'Lens or Arc', 'Merger',
+                'Other', 'Ring'],
+           'Is there a sign of a bar feature through the centre of the galaxy?':
                ['Bar', 'No Bar'],
            'How many spiral arms are there?':
-            ['1', '2', '3', '4', '5', 'Cant tell', 'More than 5'],
+               ['1', '2', '3', '4', '5', "Can't tell", 'More than 5'],
            'Could this be a disk viewed edge-on?':
                ['No', 'Yes'],
-           'Is there any sign of a spiral arm pattern?':
-               ['No Spiral', 'Spiral'],
            'How prominent is the bulge?':
-              ['Dominant', 'Just Noticable', 'No bulge', 'Obvious'],
+               ['Dominant', 'Just Noticable','No Bulge', 'Obvious'],
+           'Does the galaxy have a bulge at its centre?  If  so, what shape?':
+               ['Boxy', 'No Bulge', 'Rounded'],
            'How rounded is it?':
-               ['Cigar shaped', 'Completely round', 'In between']}
+               ['Cigar Shaped', 'Completely Round', 'In Between']}
 
-def tutorial_examples():
-    f = file('../data/tutorial_examples', 'w')
+
+def examples():
+    f = file('../data/examples', 'w')
     sys.stdout = f
-    for q in answers.keys():
-        print "=== Q:", q, "==="
+    print '<html>'
+    print '<head>'
+    print '<title>Examples of Galaxy Zoo 2 beta classifications</title>'
+    print '<link rel="stylesheet" href="./examples.css" />'
+    print '</head>'
+    print '<body>'
+    print '<h1>Examples of Galaxy Zoo 2 beta classifications</h1>'
+    for q in questions:
+        sys.stderr.write(q+'\n')
+        print '<h2>Q:', q, '</h2>'
         for a in answers[q]:
-            print "==== A:", a, "===="
-            qa_matches(q, a)
-            print '-'*70
+            sys.stderr.write(a+'\n')
+            print '<h3>A:', a, '</h3>'
             sys.stdout.flush()
+            qa_matches(q, a)
+            print '<hr />'
+            sys.stdout.flush()
+    print '</body></html>'
     sys.stdout = sys.__stdout__
 
 
-def qa_matches(q, a, n=24):
+def qa_matches(q, a, n=10):
     # find specified questions
+    #sys.stderr.write('qselect\n')
     qselect = qanda.field('question') == q
     # find specified answers
+    #sys.stderr.write('aselect\n')
     aselect = qanda[qselect].field('answer') == a
     # get matching classids
-    print '*', len(classifications), 'classifications in total'
-    classids = qanda.field('classid')[qselect]
-    print '*', len(classids), 'classifications for the specified Q'
-    classids = classids[aselect]
-    print '*', len(classids), 'classifications match the specified Q and A'
-    # get corresponding objids
-    cselect = find_indexes(classids, classifications.field('classid'))
-    objids = classifications.field('objid')[cselect]
-    objids = objids[objids > 1]
-    objids, count = find_unique(objids, count=True, sort_count=True)
-    print '*', len(objids), 'unique objects match the specified Q and A'
-    print '* The %i objects with the highest matching classification counts are:'%n
-    print '**', ', '.join(str(o) for o in objids[:n])
-    print '* with counts:'
-    print '**', ', '.join(str(o) for o in count[:n])
-    print '* Images:'
+    print '<ul>'
+    print '<li>', len(classifications), 'classifications in total'
+    classindexq = qanda.field('classindex')[qselect]
+    print '</li><li>', len(classindexq), 'classifications for the specified Q'
+    classindexqa = classindexq[aselect]
+    print '</li><li>', len(classindexqa), 'classifications match the specified Q and A'
+    # get objids of objects for which this question was asked
+    #sys.stderr.write('cselectq\n')
+    objidsq = classifications.field('objid')[classindexq]
+    goodobjidsq = objidsq > 1
+    objidsq = objidsq[goodobjidsq]
+    # get objids of above objects for which this answer was given
+    #sys.stderr.write('qselectqa\n')
+    objidsqa = classifications.field('objid')[classindexqa]
+    goodobjidsqa = objidsqa > 1
+    objidsqa = objidsqa[goodobjidsqa]
+    # get number of times Q asked and A given for each object
+    objidsq, countq = find_unique(objidsq, count=True, sort_count=True)
+    objidsqa, countqa = find_unique(objidsqa, count=True, sort_count=True)
+    qselectqa = find_indexes(objidsqa, objidsq)
+    objidsq = objidsq[qselectqa]
+    countq = countq[qselectqa]
+    nmatch = len(objidsqa)
+    likelihood = countqa/countq.astype(N.float)
+    n = min(n, len(likelihood))
+    s = countqa.argsort()[-n:][::-1]
+    objidsq = objidsq[s]
+    countq = countq[s]
+    objidsqa = objidsqa[s]
+    countqa = countqa[s]
+    likelihood = likelihood[s]
+    print '</li><li>', nmatch, 'unique objects match the specified Q and A'
+    print '</li><li>The %i objects with the most counts for this Q and A are:'%n
+    print
+    print '</li></ul><table>'
+    print '<tr><th>image</th><th>%32s</th><th>%8s</th><th>%8s</th><th>%8s</th><th>%nbsp;</th><th>image</th><th>%32s</th><th>%8s</th><th>%8s</th><th>%8s</th></tr>'%('objid', 'nanswer', 'nquestion', 'likelihood')
     for i in range(n):
-        url = get_gz2_images.get_jpeg_url(objids[i])
-        if url != '':
-            print url+'&.jpg'
+        print '<tr><td><a href="%s" target="_blank"><img src="%s" width="106px" height="106px"/></a></td><td>%32s</td><td>%8i</td><td>%8i</td><td>%8.2f</td>'%(get_gz2_images.get_jpeg_url(objidsqa[i], imgsize=424), get_gz2_images.get_jpeg_url(objidsqa[i], imgsize=106, scale=2.0), objidsqa[i], countqa[i], countq[i], likelihood[i])
+        if i%2 != 0 or i == n-1:
+            print '</tr>'
+        else:
+            print '<td>%nbsp;</td>'
+    print '</table>'
 
 
+# Massively sped up by avoiding the need for two find_indexes,
+# by adding indexes of classifications into qanda in read_gz2_db.
+# and by rewriting code more efficiently
+
+# Now find_indices finds 1000 entries in 100,000 item array
+# 25 times faster than previous, naive, version.
 def find_indexes(entries, array):
     indexes = []
+    n = len(array)
+    ids = N.arange(n)
+    sortindexes = array.argsort()
+    a = array[sortindexes]
+    idx = ids[sortindexes]
+    ileft = a.searchsorted(entries, 'left')
+    iright = a.searchsorted(entries, 'right')
+    ok = ileft < n
+    ileft = ileft[ok]
+    iright = iright[ok]
+    indexes = []
+    for i in range(len(ileft)):
+            indexes.extend(idx[ileft[i]:iright[i]])
+    return N.unique(indexes)
+
+def find_indexes_old(entries, array):
+    indexes = []
+    ids = N.arange(len(array))
     for entry in entries:
-        idx = (array == entry).nonzero()[0]
+        idx = ids[array == entry]
         for i in idx:
             if i not in indexes:
-                indexes.append(i)
-    return indexes
+                indexes.append(i)   
+    return N.array(indexes)
         
+# now finds unique entries in 10000 item array 100 times
+# faster than previous, naive, version!
 def find_unique(array, count=False, sort_count=False):
+    uniq = N.unique(array)
+    if count or sort_count:
+        a = N.sort(array)
+        counts = (a.searchsorted(uniq, 'right') -
+                  a.searchsorted(uniq, 'left'))
+    if sort_count:
+        idx = counts.argsort()[::-1]
+        uniq = uniq[idx]
+        if count:
+            counts = counts[idx]
+    if not count:
+        return uniq
+    else:
+        return uniq, counts
+
+def find_unique_old(array, count=False, sort_count=False):
     uniq = []
     counts = {}
     for entry in array:
@@ -141,11 +237,12 @@ def find_unique(array, count=False, sort_count=False):
         else:
             counts[entry] += 1
     uniq = N.array(uniq)
-    if sort_count:
+    if sort_count or count:
         c = N.array([counts[u] for u in uniq])
+    if sort_count:
         idx = c.argsort()[::-1]
         uniq = uniq[idx]
     if not count:
         return uniq
     else:
-        return uniq, [counts[u] for u in uniq]
+        return uniq, c

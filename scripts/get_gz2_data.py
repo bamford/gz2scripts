@@ -4,7 +4,7 @@ import numpy as N
 from combine_fits_tables import combine_fits_tables
 
 gz2data_path = '/Users/spb/Work/projects/GalaxyZoo2/'
-gz2sample_file = 'gz2sample_final_abs_regions_counts_wvt.old.fits'
+gz2sample_file = 'gz2sample_final_abs_regions_counts_wvt.fits'
 gz2data = pyfits.getdata(gz2data_path+gz2sample_file)
 
 #gz2extra_file = 'gz2sample_finalextra.fits'

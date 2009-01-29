@@ -178,8 +178,8 @@ def make_imaging_wget_list():
     #print "The password is 'sdss'"
 
 
-def get_jpeg_url(objid, openinbrowser=False):
-    urlformat = 'http://skyservice.pha.jhu.edu/dr6/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=424&height=423'
+def get_jpeg_url(objid, openinbrowser=False, imgsize=424, scale=1.0):
+    urlformat = 'http://skyservice.pha.jhu.edu/dr6/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=%(imgsize)i&height=%(imgsize)i'
     select = N.where(data.field('objid') == objid)[0]
     if len(select) < 1:
         #print 'Warning: objid=%s not found!'%(str(objid))
@@ -190,7 +190,7 @@ def get_jpeg_url(objid, openinbrowser=False):
     ra = data.field('ra')[select]
     dec = data.field('dec')[select]
     size = data.field('PETROR90_R')[select]
-    info = {'ra':ra, 'dec':dec, 'scale':size * 0.02}
+    info = {'ra':ra, 'dec':dec, 'scale':size * 0.02 * scale, 'imgsize':imgsize}
     url = urlformat%info
     if openinbrowser:
         webbrowser.open(url)
