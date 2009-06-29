@@ -65,7 +65,7 @@ GO
 SELECT *
 FROM
 (
-    SELECT G.*, S.z as redshift, S.zErr as redshiftErr,
+    SELECT G.*, S.z as redshift, S.zErr as redshiftErr, S.specclass,
     ROW_NUMBER() OVER(PARTITION BY G.objid ORDER BY S.zErr) AS best
     FROM gz2sample_stage3_legacy as G
     LEFT JOIN dr7.SpecObj as S on (S.bestObjID = G.objID)

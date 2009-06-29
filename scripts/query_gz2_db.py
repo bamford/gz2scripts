@@ -39,70 +39,14 @@ def tutorial_features():
 # 587742774030106785 3
 # 587731172767498868 3
 
-def get_questions():
-    questions, counts = find_unique(qanda.field('question'), count=True)
-    s = questions.argsort()
-    print s
-    questions = questions[s]
-    counts = counts[s]
-    for i in range(len(questions)):
-        print '%-65s %i'%(questions[i], counts[i])
-    return questions
-
-questions = [
-       'Is the galaxy simply smooth and rounded, with no sign of a disk?',
-       'How rounded is it?',
-       'Could this be a disk viewed edge-on?',
-       'How prominent is the bulge?',
-       'Does the galaxy have a bulge at its centre?  If  so, what shape?',
-       'Is there any sign of a spiral arm pattern?',
-       'How tightly wound do the spiral arms appear?',
-       'How many spiral arms are there?',
-       'Is there a sign of a bar feature through the centre of the galaxy?',
-       'Is there anything odd?',
-       'Is the odd feature a ring, or is the galaxy disturbed or irregular?']
-
 def get_answers():
-    answers = {}
-    for q in questions:
-        print q
-        select = qanda.field('question') == q
-        a, counts = find_unique(qanda.field('answer')[select], count=True)
-        s = a.argsort()
-        a = a[s]
-        counts = counts[s]
-        s = N.array([i.strip()[:2] != '58' for i in a])
-        a = a[s]
-        counts = counts[s]
-        answers[q] = a.tolist()
-        for i in range(len(a)):
-            print '   %40s %i'%(a[i], counts[i])
-    return answers
-
-answers = {'Is there anything odd?':
-               ['No', 'Yes'],
-           'Is the galaxy simply smooth and rounded, with no sign of a disk?':
-               ['Features or Disk', 'Smooth', 'Star or Artifact'],
-           'Is there any sign of a spiral arm pattern?':
-               ['No Spiral', 'Spiral'],
-           'How tightly wound do the spiral arms appear?':
-               ['Loose', 'Medium', 'Tight'],
-         'Is the odd feature a ring, or is the galaxy disturbed or irregular?':
-               ['Disturbed', 'Irregular', 'Lens or Arc', 'Merger', 'Ring',
-                'Other'],
-           'Is there a sign of a bar feature through the centre of the galaxy?':
-               ['Bar', 'No Bar'],
-           'How many spiral arms are there?':
-               ['1', '2', '3', '4', '5', "Can't tell", 'More than 5'],
-           'Could this be a disk viewed edge-on?':
-               ['No', 'Yes'],
-           'How prominent is the bulge?':
-               ['Dominant', 'Obvious', 'Just Noticable','No Bulge'],
-           'Does the galaxy have a bulge at its centre?  If  so, what shape?':
-               ['No Bulge', 'Rounded', 'Boxy'],
-           'How rounded is it?':
-               ['Cigar Shaped', 'In Between', 'Completely Round']}
-
+    questions = questions.field('id', 'value').distinct()
+    for qid, q, qcount in questions:
+        print qid, q, qcount
+        aid, acount = qanda.field('answer_id').where(condition = 'task_id = %i'%qid, distinct=True)
+        a = answers.field('value')[aid]
+        for i in range(len(aid)):
+            print '   %i %40s %i'%(aid[i], a[i], acount[i])
 
 def examples_multi(for_public=False):
     if for_public:
@@ -162,10 +106,10 @@ def examples(for_public=False):
         print '   e.g. multiple clicks by a single user,',
         print ' unreliable users, etc.</p>'
     if not for_public:
-        users, usercounts = find_unique(classifications.field('username'),
-                                        count=True, sort_count=True)
+        cursor.execute('SELECT * from (SELECT user_id, COUNT(*) as count from classifications GROUP BY user_id) as Q ORDER BY count DESC')
+        users, usercounts = N.transpose(cursor.fetchall())
         nusers = len(users)
-        nc = len(classifications)
+        nc = usercounts.sum()
         print '<div class="info"><p>In total:<ul>'
         print '<li>%i users</li>'%nusers
         print '<li>%i classifications</li>'%nc
@@ -232,12 +176,16 @@ def qa_matches(q, a, n=10, ncol=2, for_public=False, imgf=None):
         print '</li><li>', nqa, 'classifications match this answer '
     # get objids of objects for which this question was asked
     #sys.stderr.write('cselectq\n')
-    objidsq = classifications.field('objid')[classindexq]
+    condition = '(' + ','.join(classindexq) + ')'
+    cursor.execute('SELECT name from assets as A, asset_classifications as C where A.asset_id = C.asset_id and C.classification_id in %s', (condition,)
+    objidsq = N.transpose(cursor.fetchall())
     goodobjidsq = objidsq > 1
     objidsq = objidsq[goodobjidsq]
     # get objids of above objects for which this answer was given
     #sys.stderr.write('qselectqa\n')
-    objidsqa = classifications.field('objid')[classindexqa]
+    condition = '(' + ','.join(classindexqa) + ')'
+    cursor.execute('SELECT name from assets as A, asset_classifications as C where A.asset_id = C.asset_id and C.classification_id in %s', (condition,)
+    objidsqa = N.transpose(cursor.fetchall())
     goodobjidsqa = objidsqa > 1
     objidsqa = objidsqa[goodobjidsqa]
     objidsqa.sort()
