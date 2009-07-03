@@ -3,12 +3,16 @@ import os.path
 import numpy as N
 from combine_fits_tables import combine_fits_tables
 
-gz2data_path = '/Users/spb/Work/projects/GalaxyZoo2/'
-gz2sample_file_dr6 = 'dr6/gz2sample_final1_abs_regions_counts_wvt.fits'
-gz2data_dr6 = pyfits.getdata(gz2data_path+gz2sample_file_dr6)
+gz2data_path = '/home/ppzsb1/Projects/GalaxyZoo2/'
+
+#gz2sample_file_dr6 = 'dr6/gz2sample_final1_abs_regions_counts_wvt.fits'
+#gz2data_dr6 = pyfits.getdata(gz2data_path+gz2sample_file_dr6)
 
 gz2sample_file_dr7 = 'gz2sample_final_abs_regions_counts_wvt.fits'
 gz2data_dr7 = pyfits.getdata(gz2data_path+gz2sample_file_dr7)
+
+gz2sample_file_dr7_parents = 'gz2sample_parents.fits'
+gz2data_dr7_parents = pyfits.getdata(gz2data_path+gz2sample_file_dr7_parents)
 
 #gz2extra_file = 'gz2sample_finalextra.fits'
 #gz2extra = pyfits.getdata(gz2data_path+gz2extra_file)

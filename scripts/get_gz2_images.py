@@ -1,29 +1,43 @@
 import urllib
 import os.path
 import numpy as N
-from ppgplot_spb import *
+#from ppgplot_spb import *
 import time
 from scipy import median
 from scipy.ndimage import median_filter
 import string
 import gc
 import webbrowser
+from glob import glob
 
 from get_gz2_data import *
-data = gz2data_dr6
+data = gz2data_dr7
+parents = gz2data_dr7_parents
 
-field_path = '/Volumes/Storage/data/SDSS/fields/'
-object_path = '/Volumes/Storage/data/SDSS/gzobjects/' 
-#field_path = '/Volumes/scratch/data/SDSS/fields/'
-#object_path = '/Volumes/scratch/data/SDSS/gzobjects/' 
-location_format = 'imaging/%(run)i/%(rerun)i/corr/%(camcol)i/fpC-%(run)06i-%(band)s%(camcol)i-%(field)04i.fit.gz'
+#field_path = '/Volumes/Storage/data/SDSS/fields/'
+#object_path = '/Volumes/Storage/data/SDSS/gzobjects/' 
+field_path = '/home/ppzsb1/SDSSdata/fields/'
+mask_path = '/home/ppzsb1/SDSSdata/masks/'
+object_path = '/home/ppzsb1/SDSSdata/gzobjects/'
+fieldid_format = '%(run)06i-%(band)s%(camcol)i-%(field)04i'
+fpC_file_format = 'fpC-%s.fit.gz'
+fpM_file_format = 'fpM-%s.fit'
+fpA_file_format = 'fpAtlas-%(run)06i-%(camcol)i-%(field)04i.fit'
+drObj_file_format = 'drObj-%(run)06i-%(camcol)i-%(rerun)i-%(field)04i.fit'
+mask_file_format = 'obj-%s.fit'
+fpC_format = 'imaging/%(run)i/%(rerun)i/corr/%(camcol)i/fpC-%(run)06i-%(band)s%(camcol)i-%(field)04i.fit.gz'
+fpM_format = 'imaging/%(run)i/%(rerun)i/objcs/%(camcol)i/fpM-%(run)06i-%(band)s%(camcol)i-%(field)04i.fit'
+fpA_format = 'imaging/%(run)i/%(rerun)i/objcs/%(camcol)i/fpAtlas-%(run)06i-%(camcol)i-%(field)04i.fit'
+drObj_format = 'imaging/%(run)i/%(rerun)i/dr/%(camcol)i/drObj-%(run)06i-%(camcol)i-%(rerun)i-%(field)04i.fit'
+
+band_index = {'u':0,'g':1,'r':2,'i':3,'z':4}
 
 pixscale = 0.396127  # arcsec/pixel
 
 nskyiter = 3
 skyconv = 0.01
 
-pgend()
+#pgend()
 
 def selection():
     s = N.zeros(len(data), N.bool)
@@ -33,10 +47,13 @@ def selection():
     return s
 
 def bands():
-    return ['g', 'r', 'i']
+    return ['r']
+    #return ['g', 'r', 'i']
 
-def cut_out_objects(clobber=False):    
+def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):    
     dsel = data[selection()]
+    pid = parents.field('objid')
+    pobj = parents.field('obj')
     #dsel = data
     print '%i objects'%len(dsel)
     print '%i bands'%len(bands())
@@ -49,7 +66,7 @@ def cut_out_objects(clobber=False):
                                   'camcol': d.field('camcol'),
                                   'band': band,
                                   'field': d.field('field')}
-                fieldspec.append(location_format%fieldspec_info)
+                fieldspec.append(fieldid_format%fieldspec_info)
         fieldspec = N.array(fieldspec)
         fieldspecuniq = N.unique(fieldspec)
         unretrieved_fields = 0
@@ -57,37 +74,81 @@ def cut_out_objects(clobber=False):
         for fieldid in fieldspecuniq:
             print 'Field:', fieldid
             select = fieldspec == fieldid
-            nobj = select.astype(N.int).sum()
+            nobj = len(select.nonzero()[0])
             field = None
+            mask = None
             print '%i objects in field'%nobj
             for d in dsel[select]:
                 objid = d.field('objID')
-                size = int(d.field('petroR90_r') * 4.0 / pixscale)
+                size = int(d.field('petroR90_r') * 6.0 / pixscale)
                 print 'Object:', objid
+                rowc = d.field('rowc_%s'%band)
+                colc = d.field('colc_%s'%band)
+                obj = d.field('obj')
+                parentidx = (pid==objid).nonzero()[0]
+                if len(parentidx) > 0:
+                    parentobj = pobj[parentidx]
+                else:
+                    parentobj = None
+                fpAid = {'run':d.field('run'), 'camcol':d.field('camcol'),
+                         'field':d.field('field')}
+                print 'rowc: %.2f  colc: %.2f  obj: %i'%(rowc, colc, obj)
                 f = object_path+'%s%s.fits'%(objid,band)
+                fm = object_path+'%s%sm.fits'%(objid,band)
+                fa = object_path+'%s%sa.fits'%(objid,band)
+                fp = object_path+'%s%sp.fits'%(objid,band)
                 if clobber or not os.path.exists(f):
                     if field is None:
-                        field, fieldheader = get_field(fieldid)
-                        fieldheader = fieldheader
+                        if getmask:
+                            field, fieldheader, mask = get_field(fieldid,
+                                                                 getmask=True)
+                        else:
+                            field, fieldheader = get_field(fieldid, getmask=False)
                         if field is None:
                             print 'Could not retrieve field'
                             unretrieved_fields += 1
                             unretrieved_objects += nobj
                             continue
+                        if getmask and mask is None:
+                            print 'Could not retrieve mask'
+                            unretrieved_fields += 1
+                            unretrieved_objects += nobj
+                            continue
                     halfsize = size/2
-                    rowc = d.field('rowc_%s'%band)
-                    colc = d.field('colc_%s'%band)
-                    section = get_section(field, rowc, colc, halfsize)
-                    hdu = pyfits.PrimaryHDU(section, fieldheader)
+                    section, sectionheader = get_section(field, rowc, colc,
+                                                         halfsize, fieldheader)
+                    hdu = pyfits.PrimaryHDU(section, sectionheader)
                     hdu.writeto(f, clobber=clobber, output_verify='fix')
+                    if getmask:
+                        mask = get_section(mask, rowc, colc, halfsize,
+                                           maskfill=True)
+                        hdu = pyfits.PrimaryHDU(mask)
+                        hdu.writeto(fm, clobber=clobber, output_verify='fix')
+                    if getatlas:
+                        if os.path.exists(fa) and clobber:
+                            os.remove(fa)
+                        if not os.path.exists(fa):
+                            fpA = os.path.join(field_path, fpA_file_format%fpAid)
+                            bi = band_index[band]
+                            os.system('read_atlas_image -c %i %s %i %s'%(bi, fpA, obj, fa))
+                    if getparent:
+                        if os.path.exists(fp) and clobber:
+                            os.remove(fp)
+                        if not os.path.exists(fp):
+                            if parentobj is not None:
+                                fpA = os.path.join(field_path, fpA_file_format%fpAid)
+                                bi = band_index[band]
+                                os.system('read_atlas_image -c %i %s %i %s'%(bi, fpA, parentobj, fp))
+                            else:
+                                os.system('ln -s %s %s'%(fa, fp))
                 else:
                     print 'Object file already present - not overwriting'
             #remove_field(fieldid, band)
     print '%i objects in %i fields could not be retrieved'%(unretrieved_objects,
-                                                          unretrieved_fields)
+                                                            unretrieved_fields)
 
-def get_section(image, rowc, colc, halfsize,
-                blank=-1.0):
+def get_section(image, rowc, colc, halfsize, header=None,
+                maskfill=False, blank=-1.0):
     rowc = int(round(rowc))
     colc = int(round(colc))
     size = 2*halfsize
@@ -113,10 +174,19 @@ def get_section(image, rowc, colc, halfsize,
         colmax = image.shape[1]
     section = N.zeros((size, size), N.float) + blank
     section[secrowmin:secrowmax, seccolmin:seccolmax] = image[rowmin:rowmax, colmin:colmax]
-    return section
+    if maskfill:
+        section = N.where(floodfill(section, [halfsize, halfsize],
+                                    section[halfsize, halfsize], 99) == 99, 1, 0)
+    if header is not None:
+        section_header = header.copy()
+        section_header['CRPIX1'] += seccolmin - colmin
+        section_header['CRPIX2'] += secrowmin - rowmin
+        return section, section_header
+    else:
+        return section
 
-def get_field(field_location):
-    field_filename = os.path.join(field_path, field_location)
+def get_field(fieldid, subsky=False, getmask=True):
+    field_filename = os.path.join(field_path, fpC_file_format%fieldid)
     if os.path.exists(field_filename):
         hdu = pyfits.open(field_filename)
         hdu.verify('fix')
@@ -129,23 +199,47 @@ def get_field(field_location):
         else:
             softbias = 1000.0
         field -= softbias
-        if 'SKY' in keys:
-            sky = fieldheader['SKY']
-        else:
-            print 'No sky in header'
-            sky = median(field.ravel())
-            oldsky = sky
-            for i in range(nskyiter):
-                sky = median(field[field < sky + 3*N.sqrt(sky)].ravel())
-                if (oldsky - sky)/sky < skyconv:
-                    break
-                print "Sky estimate didn't converge to %.2f percent"%(skyconv*100)
-        field -= sky
+        if subsky:
+            if 'SKY' in keys:
+                sky = fieldheader['SKY']
+            else:
+                print 'No sky in header'
+                sky = median(field.ravel())
+                oldsky = sky
+                for i in range(nskyiter):
+                    sky = median(field[field < sky + 3*N.sqrt(sky)].ravel())
+                    if (oldsky - sky)/sky < skyconv:
+                        break
+                    print "Sky estimate didn't converge to %.2f percent"%(skyconv*100)
+            field -= sky
+        if getmask:
+            mask_filename = os.path.join(mask_path, mask_file_format%fieldid)
+            if os.path.exists(mask_filename):
+                hdu = pyfits.open(mask_filename)
+                hdu.verify('fix')
+                mask = hdu[0].data
+                hdu.close()
+            else:
+                mask = None
     else:
-        field = fieldheader = None
-    return field, fieldheader
+        field = fieldheader = mask = None
+    if getmask:
+        return field, fieldheader, mask
+    else:
+        return field, fieldheader
 
-def make_imaging_wget_list():
+def convert_masks(clobber=False):
+    finlist = glob(os.path.join(field_path, fpM_file_format%'*'))
+    for fin in finlist:
+        fout = fin.replace(field_path, mask_path)
+        fout = fout.replace('fpM', 'obj')
+        if os.path.exists(fout) and clobber:
+            os.remove(fout)
+        if not os.path.exists(fout):
+            os.system('read_mask %s 0 %s'%(fin, fout))
+
+
+def make_imaging_wget_list(getmask=True, getatlas=True, getcat=False):
     dsel = data[selection()]
     print '%i objects'%len(dsel)
     included = []
@@ -156,15 +250,24 @@ def make_imaging_wget_list():
                              'camcol': d.field('camcol'),
                              'band': band,
                              'field': d.field('field')}
-            location = location_format%location_info
+            location = fpC_format%location_info
             included.append(location)
+            if getmask:
+                location = fpM_format%location_info
+                included.append(location)
+            if getatlas:
+                location = fpA_format%location_info
+                included.append(location)
+            if getcat:
+                location = drObj_format%location_info
+                included.append(location)
 #         ls = location.split('/')
 #         n = len(ls)
 #         for i in range(1, n):
 #             l = string.join(ls[:i], '/')
 #             if l not in included:
 #                 included.append(l)
-    included.sort()
+    included = N.unique(included)
     filename='/tmp/sdss.list'
     f = open(filename, 'w')
     for i in included:
@@ -179,7 +282,7 @@ def make_imaging_wget_list():
 
 
 def get_jpeg_url(objid, openinbrowser=False, imgsize=424, scale=1.0):
-    urlformat = 'http://skyservice.pha.jhu.edu/dr6/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=%(imgsize)i&height=%(imgsize)i'
+    urlformat = 'http://skyservice.pha.jhu.edu/dr7/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=%(imgsize)i&height=%(imgsize)i'
     sortidx = data.field('objid').argsort()
     n = len(sortidx)
     select = N.searchsorted(data.field('objid')[sortidx], objid)
@@ -207,3 +310,22 @@ def get_jpeg_url(objid, openinbrowser=False, imgsize=424, scale=1.0):
         return urls[0]
     else:
         return urls
+
+
+def floodfill(image, node, target, replacement):
+    if image[node[0], node[1]] != target:  return
+    im = N.array(image, N.int)
+    Q = [node]
+    while len(Q) > 0:
+        n = Q.pop(0)
+        if im[n[0], n[1]] == target:
+            w = e = n[1]
+            while (w != 0) and (im[n[0], w] == target):  w = w-1
+            while (e != image.shape[1]-1) and (im[n[0], e] == target):  e = e+1
+            im[n[0], w+1:e] = replacement
+            for m in range(w+1, e):
+                if (n[0] != image.shape[0]-1) and (im[n[0]+1, m] == target):
+                    Q.append([n[0]+1, m])
+                if (n[0] != 0) and (im[n[0]-1, m] == target):
+                    Q.append([n[0]-1, m])
+    return im
