@@ -1,4 +1,4 @@
-
+from fits2csv import fits2csv
 from ppgplot_spb import *
 import pyfits
 import numpy as N
@@ -37,24 +37,24 @@ etadivide = [-90, 0, 90]
 
 pgend()
 
-def do_all():
+def do_all(name='final', coadd=False):
     # starting with gz2sample_final.fits from CAS
     # execute gz2_kcorrect.pro in IDL producing gz2sample_final_kcorrect.fits
-    add_physical_sizes()
-    add_regions()
-    check_regions()
-    add_bins()
-    add_bin_counts()
-    # run wvt_gz2.pro in IDL
-    plot_all_wvt()
-    add_wvt()
-    make_db_table()
+    add_physical_sizes(name)
+    add_regions(name)
+    check_regions(name)
+    add_bins(name)
+    add_bin_counts(name)
+    # run wvt_gz2.pro in IDL if bin defining sample
+    #plot_all_wvt(coadd, name)
+    add_wvt(name, coadd)
+    make_db_table(name)
 
 def notNaN(x):
     return (x > 0.0) | (x <= 0.0)
 
-def add_physical_sizes():
-    p = pyfits.open(data_path+'gz2sample_final_kcorrect.fits')
+def add_physical_sizes(sname='final'):
+    p = pyfits.open(data_path+'gz2sample_%s_kcorrect.fits'%sname)
     d = p[1].data
     r50_arcsec = d.field('petroR50_r')
     redshift = d.field('redshift')
@@ -73,16 +73,16 @@ def add_physical_sizes():
 			      array=r50_kpc))
     tbhdu=pyfits.new_table(cols)
     tbhdu.name = 'data'
-    outfile = data_path+'gz2sample_final_abs.fits'
+    outfile = data_path+'gz2sample_%s_abs.fits'%sname
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
     tbhdu.writeto(outfile)
     p.close()
 
-def add_regions():
+def add_regions(sname='final'):
     # get data
-    p = pyfits.open(data_path+'gz2sample_final_abs.fits')
+    p = pyfits.open(data_path+'gz2sample_%s_abs.fits'%sname)
     data = p[1].data
     ra = data.field('RA')
     dec = data.field('DEC')
@@ -93,7 +93,7 @@ def add_regions():
     lam, eta = ra_dec_to_lambda_eta(ra, dec)
     # divide
     region = N.zeros(n)
-    pgopen(plots_path + 'gz2_regions.ps/cps')
+    pgopen(plots_path + 'gz2_regions_%s.ps/cps'%sname)
     pgsetup()
     pgenv(lamdivide[0], lamdivide[-1], etadivide[0], etadivide[-1])
     pglab('lambda', 'eta', '') 
@@ -129,7 +129,7 @@ def add_regions():
 			      array=region))
     tbhdu=pyfits.new_table(cols)
     tbhdu.name = 'data'
-    outfile = data_path+'gz2sample_final_abs_regions.fits'
+    outfile = data_path+'gz2sample_%s_abs_regions.fits'%sname
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
@@ -137,9 +137,9 @@ def add_regions():
     p.close()
 
 
-def check_regions():
+def check_regions(sname='final'):
     # get data
-    data = pyfits.getdata(data_path+'gz2sample_final_abs_regions.fits')
+    data = pyfits.getdata(data_path+'gz2sample_%s_abs_regions.fits'%sname)
     ra = data.field('RA')
     dec = data.field('DEC')
     n = len(ra)
@@ -149,7 +149,7 @@ def check_regions():
     lam, eta = ra_dec_to_lambda_eta(ra, dec)
     # divide
     region = data.field('region')
-    pgopen(plots_path + 'gz2_regions_check.ps/cps')
+    pgopen(plots_path + 'gz2_regions_check_%s.ps/cps'%sname)
     pgsetup()
     pgenv(lamdivide[0], lamdivide[-1], etadivide[0], etadivide[-1])
     pglab('lambda', 'eta', '') 
@@ -209,8 +209,8 @@ def ra_dec_to_lambda_eta(ra, dec):
     #print 'eta:', eta
     return lam, eta
 
-def add_bins():
-    p = pyfits.open(data_path+'gz2sample_final_abs_regions.fits')
+def add_bins(sname='final'):
+    p = pyfits.open(data_path+'gz2sample_%s_abs_regions.fits'%sname)
     d = p['data'].data
     redshift = d.field('redshift')
     zmask = notNaN(redshift)
@@ -254,16 +254,16 @@ def add_bins():
 	tbhdu=pyfits.new_table(c)
         tbhdu.name = '%s_simple_bins'%k
 	hdulist.append(tbhdu)
-        outfile = data_path+'gz2sample_final_abs_regions_bins.fits'
+        outfile = data_path+'gz2sample_%s_abs_regions_bins.fits'%sname
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
     hdulist.writeto(outfile)
     p.close()
 
-def add_bin_counts():
+def add_bin_counts(sname='final'):
     # Determine counts in each mag, size and z bin
-    infile = data_path+'gz2sample_final_abs_regions_bins.fits'
+    infile = data_path+'gz2sample_%s_abs_regions_bins.fits'%sname
     p = pyfits.open(infile)
     data = p['data'].data
     # determine bins
@@ -310,26 +310,37 @@ def add_bin_counts():
     hdu = pyfits.ImageHDU(n) 
     hdu.name = 'simple_bin_counts'
     p.append(hdu)
-    outfile = data_path+'gz2sample_final_abs_regions_counts.fits'
+    outfile = data_path+'gz2sample_%s_abs_regions_counts.fits'%sname
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
     p.writeto(outfile)
     p.close()
 
-def plot_all_wvt():
-    fname = 'gz2_wvt_bins'
+def plot_all_wvt(sname='final', coadd=False):
+    if coadd:
+        fname = 'gz2_coadd_wvt_bins'
+    else:
+        fname = 'gz2_wvt_bins'
     fd = wvt_path+fname+'.fits'
     nz = pyfits.getval(fd, 'NAXIS3')
     print 'nz:', nz
-    for fname in ['gz2_wvt_bins', 'gz2_wvt_counts_all']:
+    if coadd:
+        fnames = ['gz2_coadd_wvt_bins', 'gz2_coadd_wvt_counts_all']
+    else:
+        fnames = ['gz2_wvt_bins', 'gz2_wvt_counts_all']
+    for fname in fnames:
         for iz in range(nz):
-            plot_wvt(iz, fname)
+            plot_wvt(iz, fname, sname)
     for iz in range(nz):
-        plot_wvt(iz, fname='gz2_wvt_density_all', logplot=True)
+        if coadd:
+            fname = 'gz2_coadd_wvt_density_all'
+        else:
+            fname = 'gz2_wvt_density_all'
+        plot_wvt(iz, fname, sname, logplot=True)
     
 
-def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
+def plot_wvt(zbin=5, fname='gz2_wvt_bins', sname='final', logplot=False):
     fd = wvt_path+fname+'.fits'
     d = pyfits.getdata(fd)
     d = d[zbin, min_magbin:max_magbin+1,
@@ -341,7 +352,7 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
         d[mask] = 1.0
         d = N.log10(d)
         d[mask] = bg_count
-    fn = wvt_path+'gz2_wvt_nodes.fits'
+    fn = fd.replace('_bins', '_nodes')
     nodes = pyfits.getdata(fn)
     nodes = nodes[zbin]
     nodes = nodes[:,(nodes[0] > 0.001) & (nodes[1] > 0.001)]    
@@ -349,7 +360,7 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', logplot=False):
     nodes[1] = (nodes[1] + 0.5) * bin_step + bin_min
     bin_min, bin_max, bin_step = bins['petroR50_r_kpc']
     nodes[0] = (nodes[0] + 0.5) * bin_step + bin_min
-    f = data_path+'gz2sample_final_abs_regions_counts.fits'
+    f = data_path+'gz2sample_%s_abs_regions_counts.fits'%sname
     p = pyfits.open(f)
     zbins = p['redshift_simple_bins'].data
     magbins = p['petroMag_Mr_simple_bins'].data
@@ -387,10 +398,13 @@ def hires(x):
     return x_hires
 
 
-def add_wvt():
-    fwvt = wvt_path+'gz2_wvt_bins.fits'
+def add_wvt(sname='final', coadd=False):
+    if coadd:
+        fwvt = wvt_path+'gz2_coadd_wvt_bins.fits'
+    else:
+        fwvt = wvt_path+'gz2_wvt_bins.fits'
     wvt = pyfits.getdata(fwvt)
-    f = data_path+'gz2sample_final_abs_regions_counts.fits'
+    f = data_path+'gz2sample_%s_abs_regions_counts.fits'%sname
     p = pyfits.open(f)
     d = p['data'].data
     zbin = d.field('redshift_simple_bin')
@@ -424,15 +438,15 @@ def add_wvt():
     for ip in p[1:]:
         if ip.name.lower() != 'data':
             hdulist.append(ip)
-    outfile = data_path+'gz2sample_final_abs_regions_counts_wvt.fits'
+    outfile = data_path+'gz2sample_%s_abs_regions_counts_wvt.fits'%sname
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
     hdulist.writeto(outfile)
 
-def make_db_table():
+def make_db_table(sname='final'):
     # table for GZ2 site database
-    f = data_path+'gz2sample_final_abs_regions_counts_wvt.fits'
+    f = data_path+'gz2sample_%s_abs_regions_counts_wvt.fits'%sname
     p = pyfits.open(f)
     d = p['data'].data
     n = len(d)
@@ -453,12 +467,15 @@ def make_db_table():
     #                               array=N.zeros(n)))
     tbhdu=pyfits.new_table(cols)
     tbhdu.name = 'data'
-    outfile = data_path+'gz2sample_db.fits'
+    outfile = data_path+'gz2sample_%s_db.fits'%sname
     file_exists = os.path.isfile(outfile)
     if file_exists:
 	os.remove(outfile)
     tbhdu.writeto(outfile)
-
+    csvfile = outfile.replace('.fits', '.csv')
+    fits2csv(outfile, csvfile)
+    os.system('gzip %s &'%csvfile)
+    
 def make_db_table2():
     # table for GZ2 site database which matches old table columns
     f = data_path+'gz2sample_final_abs_regions_counts_wvt.fits'
@@ -488,3 +505,38 @@ def make_db_table2():
     if file_exists:
 	os.remove(outfile)
     tbhdu.writeto(outfile)
+
+def make_abs_cas_table(sname='final'):
+    # table for GZ2 site database
+    f = data_path+'gz2sample_%s_abs_regions_counts_wvt.fits'%sname
+    p = pyfits.open(f)
+    d = p['data'].data
+    n = len(d)
+    oldcols = p['data'].columns
+    cols = []
+    select = notNaN(d.PETROR50_R_KPC)
+    d = d[select]
+    for c in oldcols:
+	name = c.name.upper()
+        if name in ['OBJID', 'PETROR50_R_KPC',
+                    'PETROMAG_MU', 'PETROMAG_MG',
+                    'PETROMAG_MR', 'PETROMAG_MI', 'PETROMAG_MZ',
+                    'PETROMAGERR_MU', 'PETROMAGERR_MG',
+                    'PETROMAGERR_MR', 'PETROMAGERR_MI', 'PETROMAGERR_MZ']:
+            cols.append(pyfits.Column(name=name, format=c.format,
+                                      array=d.field(c.name)))
+    #cols.append(pyfits.Column(name='CLASSCOUNT', format='I',
+    #                               array=N.zeros(n)))
+    #cols.append(pyfits.Column(name='COMPCOUNT', format='I',
+    #                               array=N.zeros(n)))
+    tbhdu=pyfits.new_table(cols)
+    tbhdu.name = 'data'
+    outfile = data_path+'gz2sample_%s_abs_for_cas.fits'%sname
+    file_exists = os.path.isfile(outfile)
+    if file_exists:
+	os.remove(outfile)
+    tbhdu.writeto(outfile)
+    csvfile = outfile.replace('.fits', '.csv')
+    fits2csv(outfile, csvfile)
+    os.remove(outfile)
+    #os.system('gzip %s &'%csvfile)

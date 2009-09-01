@@ -12,7 +12,7 @@ from glob import glob
 
 from get_gz2_data import *
 data = gz2data_dr7
-parents = gz2data_dr7_parents
+#parents = gz2data_dr7_parents
 
 #field_path = '/Volumes/Storage/data/SDSS/fields/'
 #object_path = '/Volumes/Storage/data/SDSS/gzobjects/' 
@@ -281,8 +281,39 @@ def make_imaging_wget_list(getmask=True, getatlas=True, getcat=False):
     #print "The password is 'sdss'"
 
 
-def get_jpeg_url(objid, openinbrowser=False, imgsize=424, scale=1.0):
-    urlformat = 'http://skyservice.pha.jhu.edu/dr7/ImgCutout/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=%(imgsize)i&height=%(imgsize)i'
+def get_lesson_images(rmin=10.0, rmax=25.0, magmax=14, n=400, browser=False):
+    selection = data.field('petroR90_r') > rmin
+    selection &= data.field('petroR90_r') < rmax
+    selection &= data.field('petroMag_r') < magmax
+    selection = selection.nonzero()[0]
+    count = len(selection)
+    print count
+    skip = count/n 
+    selection = selection[::skip]
+    selection = selection[:n]
+    print len(selection)
+    objids = data.field('objid')[selection]
+    urls = get_jpeg_url(objids, openinbrowser=browser,
+                        imgsize=600, ratio=1.5, scale=0.6)
+    page = "<html><body>\n"
+    for u in urls:
+        page += '<a href="%s" target="_blank"><img style="margin:10px" src="%s" width="450px" height="300px"/></a>\n'%(u, u)
+    page += "</html></body>"
+    f = file('../lesson/images.html', 'w')
+    f.write(page)
+    f.close()
+    f = file('../lesson/images_list', 'w')
+    for i, u in enumerate(urls):
+        o = objids[i]
+        text = '%s %s\n'%(o, u)
+        f.write(text)
+    f.close()
+
+def get_jpeg_url(objid, openinbrowser=False, imgsize=424, ratio=1, scale=1.0, adaptscale=False):
+    urlformat = 'http://casjobs.sdss.org/ImgCutoutDR7/getjpeg.aspx?ra=%(ra).6f&dec=%(dec).6f&scale=%(scale).6f&width=%(imgsizex)i&height=%(imgsizey)i'
+    imgsizex = imgsizey = imgsize
+    if ratio != 1:
+        imgsizex = imgsize*ratio
     sortidx = data.field('objid').argsort()
     n = len(sortidx)
     select = N.searchsorted(data.field('objid')[sortidx], objid)
@@ -300,8 +331,12 @@ def get_jpeg_url(objid, openinbrowser=False, imgsize=424, scale=1.0):
         if bad[i]:
             urls.append('')
         else:
-            info = {'ra':ra[i], 'dec':dec[i], 'scale':size[i] * 0.02 * scale,
-                    'imgsize':imgsize}
+            if adaptscale:
+                imgscale = size[i] * 0.02 * scale
+            else:
+                imgscale = scale * pixscale
+            info = {'ra':ra[i], 'dec':dec[i], 'scale':imgscale,
+                    'imgsizex':imgsizex, 'imgsizey':imgsizey}
             url = urlformat%info
             if openinbrowser:
                 webbrowser.open(url)

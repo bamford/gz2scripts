@@ -1,8 +1,15 @@
 PRO WVT_GZ2
   ;Perform WVT binning on Galaxy Zoo 2 data to constant counts per bin
-  counts_per_bin = 200
-  ;Read in the counts image 
-  data=mrdfits('../gz2sample_final_abs_regions_counts.fits', $
+  ; for normal
+  ;counts_per_bin = 200
+  ; for coadd
+  counts_per_bin = 50
+  ;Read in the counts image
+  ; for normal
+  ;data=mrdfits('../gz2sample_final_abs_regions_counts.fits', $
+  ;                 'simple_bin_counts') 
+  ; for coadd
+  data=mrdfits('../gz2sample_final_stripe82_coadd_abs_regions_counts.fits', $
                    'simple_bin_counts') 
   dim = size(data, /dimensions)
   binnedimage = fltarr(dim)
@@ -54,9 +61,16 @@ PRO WVT_GZ2
   ENDFOR
   ;max_area=max_area
   ;Save the output in another fits image
-  mwrfits, binnedimage, '../gz2_wvt_density_all.fits', /create
-  mwrfits, binnumber, '../gz2_wvt_bins.fits', /create
-  mwrfits, nodes, '../gz2_wvt_nodes.fits', /create
-  mwrfits, snmap, '../gz2_wvt_counts_all.fits', /create
-  mwrfits, maskarr, '../gz2_wvt_mask.fits', /create
+  ; for normal
+  ;mwrfits, binnedimage, '../gz2_wvt_density_all.fits', /create
+  ;mwrfits, binnumber, '../gz2_wvt_bins.fits', /create
+  ;mwrfits, nodes, '../gz2_wvt_nodes.fits', /create
+  ;mwrfits, snmap, '../gz2_wvt_counts_all.fits', /create
+  ;mwrfits, maskarr, '../gz2_wvt_mask.fits', /create
+  ; for coadd
+  mwrfits, binnedimage, '../gz2_coadd_wvt_density_all.fits', /create
+  mwrfits, binnumber, '../gz2_coadd_wvt_bins.fits', /create
+  mwrfits, nodes, '../gz2_coadd_wvt_nodes.fits', /create
+  mwrfits, snmap, '../gz2_coadd_wvt_counts_all.fits', /create
+  mwrfits, maskarr, '../gz2_coadd_wvt_mask.fits', /create
 END

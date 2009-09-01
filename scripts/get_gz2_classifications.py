@@ -1,8 +1,8 @@
 import MySQLdb
 
-user = 'sciapi'
-host = 'scidb.galaxyzoo.org'
-password = 'Snsp_Imms'
+user = 'zoodb'
+host = '174.129.193.193'
+password = 'Znsp_Imms'
 database = 'juggernaut_production'
 
 class table_helper:
@@ -24,7 +24,7 @@ class table_column:
     def select(self, condition=False, distinct=False):
         if condition:
             condition = 'where %s'%condition
-        if distinct:
+        if not distinct:
             table.cursor.execute('SELECT %s from %s %s order by id',
                                  (self.field, self.table.table, condition))
             return table.cursor.fetchall()
@@ -46,6 +46,8 @@ cursor = db.cursor(MySQLdb.cursors.SSCursor)
 qanda = table_helper('annotations', cursor)
 
 answers = table_helper('answers', cursor)
+
+questions = table_helper('answers', cursor)
 
 # OLD:
 # import pyfits
