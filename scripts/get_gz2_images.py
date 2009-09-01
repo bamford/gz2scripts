@@ -9,6 +9,7 @@ import string
 import gc
 import webbrowser
 from glob import glob
+import subprocess
 
 from get_gz2_data import *
 data = gz2data_dr7
@@ -55,8 +56,9 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
     pid = parents.field('objid')
     pobj = parents.field('obj')
     #dsel = data
-    print '%i objects'%len(dsel)
-    print '%i bands'%len(bands())
+    log = file('../cut_out_objects.log', 'w', buffering=1)
+    log.write('%i objects'%len(dsel)+'\n')
+    log.write('%i bands'%len(bands())+'\n')
     fieldspec = []
     for band in bands():
         fieldspec = []
@@ -72,16 +74,16 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
         unretrieved_fields = 0
         unretrieved_objects = 0
         for fieldid in fieldspecuniq:
-            print 'Field:', fieldid
+            log.write('### Field: '+fieldid+'\n')
             select = fieldspec == fieldid
             nobj = len(select.nonzero()[0])
             field = None
             mask = None
-            print '%i objects in field'%nobj
+            log.write('%i objects in field'%nobj+'\n')
             for d in dsel[select]:
                 objid = d.field('objID')
                 size = int(d.field('petroR90_r') * 6.0 / pixscale)
-                print 'Object:', objid
+                log.write('*** Object: '+str(objid)+'\n')
                 rowc = d.field('rowc_%s'%band)
                 colc = d.field('colc_%s'%band)
                 obj = d.field('obj')
@@ -92,7 +94,7 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                     parentobj = None
                 fpAid = {'run':d.field('run'), 'camcol':d.field('camcol'),
                          'field':d.field('field')}
-                print 'rowc: %.2f  colc: %.2f  obj: %i'%(rowc, colc, obj)
+                log.write('rowc: %.2f  colc: %.2f  obj: %i'%(rowc, colc, obj)+'\n')
                 f = object_path+'%s%s.fits'%(objid,band)
                 fm = object_path+'%s%sm.fits'%(objid,band)
                 fa = object_path+'%s%sa.fits'%(objid,band)
@@ -105,12 +107,12 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                         else:
                             field, fieldheader = get_field(fieldid, getmask=False)
                         if field is None:
-                            print 'Could not retrieve field'
+                            log.write('Could not retrieve field'+'\n')
                             unretrieved_fields += 1
                             unretrieved_objects += nobj
                             continue
                         if getmask and mask is None:
-                            print 'Could not retrieve mask'
+                            log.write('Could not retrieve mask'+'\n')
                             unretrieved_fields += 1
                             unretrieved_objects += nobj
                             continue
@@ -130,7 +132,10 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                         if not os.path.exists(fa):
                             fpA = os.path.join(field_path, fpA_file_format%fpAid)
                             bi = band_index[band]
-                            os.system('read_atlas_image -c %i %s %i %s'%(bi, fpA, obj, fa))
+                            status = subprocess.Popen('read_atlas_image -c %i %s %i %s'%(bi, fpA, obj, fa), shell=True).communicate()
+                            print status
+                            if status != '':
+                                'Error reading object atlas image'
                     if getparent:
                         if os.path.exists(fp) and clobber:
                             os.remove(fp)
@@ -138,14 +143,17 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                             if parentobj is not None:
                                 fpA = os.path.join(field_path, fpA_file_format%fpAid)
                                 bi = band_index[band]
-                                os.system('read_atlas_image -c %i %s %i %s'%(bi, fpA, parentobj, fp))
+                                status = subprocess.Popen('read_atlas_image -c %i %s %i %s'%(bi, fpA, parentobj, fp), shell=True).communicate()
+                                print status
+                                if status != '':
+                                    'Error reading parent atlas image'
                             else:
                                 os.system('ln -s %s %s'%(fa, fp))
                 else:
-                    print 'Object file already present - not overwriting'
+                    log.write('Object file already present - not overwriting'+'\n')
             #remove_field(fieldid, band)
-    print '%i objects in %i fields could not be retrieved'%(unretrieved_objects,
-                                                            unretrieved_fields)
+    log.write('%i objects in %i fields could not be retrieved'%(unretrieved_objects,
+                                                unretrieved_fields)+'\n')
 
 def get_section(image, rowc, colc, halfsize, header=None,
                 maskfill=False, blank=-1.0):
