@@ -89,7 +89,9 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                 obj = d.field('obj')
                 parentidx = (pid==objid).nonzero()[0]
                 if len(parentidx) > 0:
-                    parentobj = pobj[parentidx]
+                    parentobj = pobj[parentidx[0]]
+                    if parentobj <= 0:
+                        parentobj = None
                 else:
                     parentobj = None
                 fpAid = {'run':d.field('run'), 'camcol':d.field('camcol'),
@@ -121,6 +123,7 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                                                          halfsize, fieldheader)
                     hdu = pyfits.PrimaryHDU(section, sectionheader)
                     hdu.writeto(f, clobber=clobber, output_verify='fix')
+                    print obj, parentobj
                     if getmask:
                         mask = get_section(mask, rowc, colc, halfsize,
                                            maskfill=True)
@@ -133,7 +136,7 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                             fpA = os.path.join(field_path, fpA_file_format%fpAid)
                             bi = band_index[band]
                             status = subprocess.Popen('read_atlas_image -c %i %s %i %s'%(bi, fpA, obj, fa), shell=True).communicate()
-                            print status
+                            #print status
                             if status != '':
                                 'Error reading object atlas image'
                     if getparent:
@@ -144,7 +147,7 @@ def cut_out_objects(clobber=False, getmask=True, getatlas=True, getparent=True):
                                 fpA = os.path.join(field_path, fpA_file_format%fpAid)
                                 bi = band_index[band]
                                 status = subprocess.Popen('read_atlas_image -c %i %s %i %s'%(bi, fpA, parentobj, fp), shell=True).communicate()
-                                print status
+                                #print status
                                 if status != '':
                                     'Error reading parent atlas image'
                             else:
@@ -244,7 +247,7 @@ def convert_masks(clobber=False):
         if os.path.exists(fout) and clobber:
             os.remove(fout)
         if not os.path.exists(fout):
-            os.system('read_mask %s 0 %s'%(fin, fout))
+            os.system('read_seg %s 0 %s'%(fin, fout))
 
 
 def make_imaging_wget_list(getmask=True, getatlas=True, getcat=False):
@@ -268,17 +271,17 @@ def make_imaging_wget_list(getmask=True, getatlas=True, getcat=False):
                 included.append(location)
             if getcat:
                 location = drObj_format%location_info
-                included.append(location)
-#         ls = location.split('/')
-#         n = len(ls)
-#         for i in range(1, n):
-#             l = string.join(ls[:i], '/')
-#             if l not in included:
-#                 included.append(l)
+                included.append(location)                
     included = N.unique(included)
+    notgot = []
+    for i in included:
+        fn = i.split('/')[-1]
+        if not os.path.exists(field_path+fn):
+            notgot.append(i)
+    print '%i files to retrieve'%len(notgot)
     filename='/tmp/sdss.list'
     f = open(filename, 'w')
-    for i in included:
+    for i in notgot:
         f.write('%s\n'%i)
     f.close()
     print 'Execute commands:'
