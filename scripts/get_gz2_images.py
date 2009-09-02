@@ -13,7 +13,7 @@ import subprocess
 
 from get_gz2_data import *
 data = gz2data_dr7
-#parents = gz2data_dr7_parents
+parents = gz2data_dr7_parents
 
 #field_path = '/Volumes/Storage/data/SDSS/fields/'
 #object_path = '/Volumes/Storage/data/SDSS/gzobjects/' 
@@ -184,7 +184,7 @@ def get_section(image, rowc, colc, halfsize, header=None,
     section[secrowmin:secrowmax, seccolmin:seccolmax] = image[rowmin:rowmax, colmin:colmax]
     if maskfill:
         section = N.where(floodfill(section, [halfsize, halfsize],
-                                    section[halfsize, halfsize], 99) == 99, 1, 0)
+                                    section[halfsize, halfsize], -99) == -99, 1, 0)
     if header is not None:
         section_header = header.copy()
         section_header['CRPIX1'] += seccolmin - colmin

@@ -6,6 +6,8 @@ import sys
 from math import pi
 import cosmology
 import time
+from glob import glob
+from combine_fits_tables import concatenate_fits_tables
 
 import gc
 gc.collect()
@@ -36,6 +38,11 @@ lamdivide = [-90, -30, 0, 30, 90]
 etadivide = [-90, 0, 90]
 
 pgend()
+
+def concatenate_dr7_tables():
+    files = glob(data_path+'gz2sample_final_dr7*wvt.fits')
+    tables = [[pyfits.open(f)['data']] for f in files]
+    concatenate_fits_tables(tables, data_path+'gz2sample_final_dr7_wvt.fits')
 
 def do_all(name='final', coadd=False):
     # starting with gz2sample_final.fits from CAS
