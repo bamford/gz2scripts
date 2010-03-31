@@ -156,6 +156,30 @@ AND (((redshift > 0.0005) AND (redshift < 0.25)) OR redshift IS NULL)
 -- and labelling by s82 instead of legacy.
 -- Results in gz2_dr7_s82
 
+-- TO COMBINE LEGACY AND STRIPE 82 NORMAL DEPTH CATALOGUES
+SELECT *
+INTO gz2sample_finaldr7
+FROM (
+SELECT objID, run, rerun, camcol, field, obj, ra, dec, petroR50_r, petroR90_r,
+petroMag_u, petroMag_g, petroMag_r, petroMag_i, petroMag_z,
+petroMagErr_u, petroMagErr_g, petroMagErr_r, petroMagErr_i, petroMagErr_z,
+psfMag_r, fiberMag_r, deVMag_r, deVMagErr_r, expMag_r, expMagErr_r, fracDeV_r,
+(petroMag_r + 2.5*log10(6.283185*power(petroR50_r, 2))) as mu50_r,
+extinction_u, extinction_g, extinction_r, extinction_i, extinction_z,
+cmodelMag_r, cmodelMagErr_r, redshift, redshiftErr, specclass
+FROM gz2sample_finaldr7_legacy
+UNION
+SELECT objID, run, rerun, camcol, field, obj, ra, dec, petroR50_r, petroR90_r,
+petroMag_u, petroMag_g, petroMag_r, petroMag_i, petroMag_z,
+petroMagErr_u, petroMagErr_g, petroMagErr_r, petroMagErr_i, petroMagErr_z,
+psfMag_r, fiberMag_r, deVMag_r, deVMagErr_r, expMag_r, expMagErr_r, fracDeV_r,
+(petroMag_r + 2.5*log10(6.283185*power(petroR50_r, 2))) as mu50_r,
+extinction_u, extinction_g, extinction_r, extinction_i, extinction_z,
+cmodelMag_r, cmodelMagErr_r, redshift, redshiftErr, specclass
+FROM gz2_dr7_s82
+) AS X
+ORDER BY objID
+
 ----------------------------------------------------------------------
 -- Get coadd-depth matches for normal-depth selected sample
 ----------------------------------------------------------------------

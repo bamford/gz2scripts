@@ -515,11 +515,11 @@ def make_db_table2():
 
 def make_abs_cas_table(sname='final'):
     # table for GZ2 site database
-    f = data_path+'gz2sample_%s_abs_regions_counts_wvt.fits'%sname
+    f = data_path+'gz2sample_%s_wvt.fits'%sname
     p = pyfits.open(f)
-    d = p['data'].data
+    d = p[1].data
     n = len(d)
-    oldcols = p['data'].columns
+    oldcols = p[1].columns
     cols = []
     select = notNaN(d.PETROR50_R_KPC)
     d = d[select]

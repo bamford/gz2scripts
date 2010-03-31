@@ -17,7 +17,6 @@ infilename = '../gz2sample_final_dr7_stripe82.fits'
 ;outfilename = '../gz2sample_final_stripe82_coadd_kcorrect.fits'
 outfilename = '../gz2sample_final_dr7_stripe82_kcorrect.fits'
 
-
 ; load the fits file. Needs the rsi library installed
 data = mrdfits(infilename,1)
 
