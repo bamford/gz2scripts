@@ -1,19 +1,22 @@
--- ssh -L 3307:${EC2URL}:3306 mt
--- mysql5 -A -u zoodb -p -h 127.0.0.1 -P 3307 juggernaut_production
--- OR
 -- ssh -i GZ.pem root@$EC2URL
 -- mysql -u zoodb -p juggernaut_production
 -- OR
 -- mysql5 -A -u zoodb -p -h $EC2URL juggernaut_production
 
-CREATE USER 'steven' IDENTIFIED BY 'hRs3mo2';
-GRANT SELECT ON juggernaut_production.* TO 'steven';
-GRANT ALL ON reduction.* TO 'steven';
+CREATE USER 'steven'@'%' IDENTIFIED BY 'hRs3mo2';
+GRANT SELECT ON juggernaut_production.* TO 'steven'@'%';
+GRANT ALL ON reduction.* TO 'steven'@'%';
+
+-- the following only possible when connecting from other host
+-- as zoodb@localhost does not have sufficient permissions!
+CREATE USER 'steven'@'localhost' IDENTIFIED BY 'hRs3mo2';
+GRANT SELECT ON juggernaut_production.* TO 'steven'@'localhost';
+GRANT ALL ON reduction.* TO 'steven'@'localhost';
 
 create database reduction;
 quit;
 
--- mysql5 -A -u steven -p -h 127.0.0.1 -P 3307 reduction
+-- mysql5 -A -u steven -p reduction
 -- OR
 -- mysql5 -A -u steven --password=hRs3mo2 -h $EC2URL reduction
 
@@ -33,7 +36,7 @@ source scripts/reduce_gz2_db.sql
 
 call reduce();
 
--- can now iterate down weighting inconsistent users
+-- can now iterate, down-weighting inconsistent users
 
 truncate table user_weights;
 insert into user_weights
