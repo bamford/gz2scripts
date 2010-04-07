@@ -6,14 +6,20 @@
 CREATE USER 'steven'@'%' IDENTIFIED BY 'hRs3mo2';
 GRANT SELECT ON juggernaut_production.* TO 'steven'@'%';
 GRANT ALL ON reduction.* TO 'steven'@'%';
+GRANT ALL ON reduction2.* TO 'steven'@'%';
+GRANT ALL ON reduction3.* TO 'steven'@'%';
 
 -- the following only possible when connecting from other host
 -- as zoodb@localhost does not have sufficient permissions!
 CREATE USER 'steven'@'localhost' IDENTIFIED BY 'hRs3mo2';
 GRANT SELECT ON juggernaut_production.* TO 'steven'@'localhost';
 GRANT ALL ON reduction.* TO 'steven'@'localhost';
+GRANT ALL ON reduction2.* TO 'steven'@'localhost';
+GRANT ALL ON reduction3.* TO 'steven'@'localhost';
 
 create database reduction;
+create database reduction2;
+create database reduction3;
 quit;
 
 -- mysql5 -A -u steven -p reduction
@@ -38,10 +44,15 @@ call reduce();
 
 -- can now iterate, down-weighting inconsistent users
 
-truncate table user_weights;
+use reduction2;
+
+create table `user_weights` (
+  `user_id` int(11) primary key,
+  `weight` float(3,2) default null
+);
 insert into user_weights
-select user_id, least(1.0, power((average/0.5), 4)) as weight
-from user_consistency;
+select user_id, least(1.0, power((average/0.6), 8.5)) as weight
+from reduction.user_consistency;
 
 -- potentially could quite easily include a timescale,
 -- i.e. instead of completely rejecting users, reject bad user-weeks!
