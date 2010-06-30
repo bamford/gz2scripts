@@ -41,13 +41,6 @@ def wars_sort_swap(galaxies, winners, losers, niter=32, damped=True, progressive
             print 'NOT UNIQUE!'
     return sorted
 
-numpy.random.seed(12345)
-ngal=200
-nwars=2000
-galaxies = numpy.random.permutation(ngal)
-a = galaxies[numpy.random.randint(ngal, size=nwars)]
-b = galaxies[numpy.random.randint(ngal, size=nwars)]
-r = numpy.random.uniform(size=nwars)
 
 def wars_sort_test(fn, wrong=0.0, ntime=5, niter=1, damped=False, progressive_damping=True, dfactor=3.0):
     awin = (a >= b)
@@ -80,6 +73,13 @@ def wars_sort_test(fn, wrong=0.0, ntime=5, niter=1, damped=False, progressive_da
 wars_sorts = (wars_sort_swap,)
 
 if __name__ == '__main__':
+    numpy.random.seed(12345)
+    ngal=200
+    nwars=2000
+    galaxies = numpy.random.permutation(ngal)
+    a = galaxies[numpy.random.randint(ngal, size=nwars)]
+    b = galaxies[numpy.random.randint(ngal, size=nwars)]
+    r = numpy.random.uniform(size=nwars)
     for fn in wars_sorts:
         print fn.__name__
         print '%5s %5s %8s %11s %8s %5s %5s %5s'%('wrong', 'niter', 'damped', 'progressive', 'dfactor', 'mad%', 'bias%', 'time')
@@ -93,3 +93,26 @@ if __name__ == '__main__':
                                                      progressive_damping=progressive, dfactor=dfactor)
                             print '%5.2f %5i %8s %11s %8.2f %5.1f %5.2f %5.2f'%(wrong, niter, damped, progressive, dfactor, m, s, t)
     
+
+def do_wars_sort():
+    winners = []
+    losers = []
+    battle_bins = []
+    for l in file('../data/final/wars_battles.csv'):
+        ls = l.split(',')
+        winners.append(ls[4])
+        losers.append(ls[5])
+        battle_bins.append(ls[-1])
+    winners = numpy.asarray(winners)
+    losers = numpy.asarray(losers)
+    battle_bins = numpy.asarray(battle_bins)
+    battles = numpy.unique(battle_bins)
+    for b in battles:
+        select = battle_bins == b
+        w = winners[select]
+        l = losers[select]
+        galaxies = numpy.concatenate((w, l))
+        galaxies = numpy.unique(galaxies)
+        result = wars_sort_swap(galaxies, w, l, niter=8, damped=True,
+                                progressive_damping=True, dfactor=5.0)
+        

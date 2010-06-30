@@ -2,8 +2,8 @@ DELIMITER //
 -- *****************************************************************************
 -- For full GZ2 dataset this whole procedure takes about two hours on m2xlarge.
 
-drop procedure if exists reduce_initial;
-create procedure reduce_initial ()
+drop procedure if exists reduce_initial_pl_de;
+create procedure reduce_initial_pl_de ()
 begin
 
 -- select classifications to consider
@@ -11,8 +11,8 @@ create table selected_classifications like juggernaut_production.classifications
 insert into selected_classifications
 select *
 from juggernaut_production.classifications
--- where -- project_id = 1 and 
--- application_identifier = 'Galaxy Zoo 2: en';
+where -- project_id = 1 and 
+application_identifier in ('Galaxy Zoo 2: pl', 'Galaxy Zoo 2: de');
 -- and created_at between CAST('2009-02-16' AS DATETIME) and CAST('2009-03-16' AS DATETIME)
 
 -- select relevent (non-wars) annotations for these classifications

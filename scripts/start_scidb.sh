@@ -2,15 +2,21 @@
 
 # Use a spot instance (cheaper but less certain)
 # m1.large 64-bit:
-ec2-request-spot-instances ami-7487651d --instance-type m1.large --availability-zone us-east-1a --key GZ --group db -p 0.20
+#ec2-request-spot-instances ami-7487651d --instance-type m1.large --availability-zone us-east-1a --key GZ --group db -p 0.20
 # m2.xlarge 64-bit (extra memory helps for initial reduction):
-ec2-request-spot-instances ami-7487651d --instance-type m2.xlarge --availability-zone us-east-1a --key GZ --group db -p 0.20
+#ec2-request-spot-instances ami-7487651d --instance-type m2.xlarge --availability-zone us-east-1a --key GZ --group db -p 0.25
 
 sleep 30
 
 # Use a normal instance
-#ec2-run-instances ami-7487651d --instance-type m1.large --availability-zone us-east-1a --key GZ --group db
+ec2-run-instances ami-7487651d --instance-type m1.large --availability-zone us-east-1a --key GZ --group db
 #ec2-run-instances ami-7487651d --instance-type m2.xlarge --availability-zone us-east-1a --key GZ --group db
+
+# Create a volume from the GZ2 database snapshot
+#EC2VOLUME=`ec2-create-volume --size 50 --snapshot snap-6ec77206 --availability-zone us-east-1a | awk '{print $2}'`
+# OR
+# Use volume saved from the previous GZ2 reduction
+EC2VOLUME="vol-8b59e7e2"
 
 EC2STATUS=""
 while [ "$EC2STATUS" != "running" ]
@@ -20,15 +26,6 @@ do
 done
 EC2INSTANCE=`ec2-describe-instances | grep INSTANCE | grep GZ | tail -1 | awk '{print $2}'`
 echo $EC2INSTANCE
-
-# Create a volume from the GZ2 database snapshot
-#EC2VOLUME=`ec2-create-volume --size 40 --snapshot snap-4b9b8922 --availability-zone us-east-1a | awk '{print $2}'`
-# OR
-# Create a volume saved from the previous GZ2 reduction
-#EC2VOLUME=`ec2-create-volume --snapshot snap-31110958 --availability-zone us-east-1a | awk '{print $2}'`
-# OR
-# Use volume saved from the previous GZ2 reduction
-EC2VOLUME="vol-ddae0cb4"
 
 EC2STATUS=""
 while [ "$EC2STATUS" != 'available' ]
@@ -47,13 +44,12 @@ do
     EC2STATUS=`ec2-describe-volumes $EC2VOLUME | grep ATTACHMENT | awk '{print $5}'`
 done
 
-
 EC2URL=`ec2-describe-instances $EC2INSTANCE | grep INSTANCE | awk '{print $4}'`
 echo $EC2URL
 
-ssh -i GZ.pem root@$EC2URL
 
 # RESIZE PARTITION IF VOLUME CREATED FROM ORIGINAL SNAPSHOT
+#ssh -i GZ.pem root@$EC2URL
 #apt-get install xfsprogs
 #mount /vol
 #xfs_growfs /vol
