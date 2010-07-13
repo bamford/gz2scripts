@@ -10,7 +10,7 @@ begin
 create table selected_classifications like juggernaut_production.classifications;
 insert into selected_classifications
 select *
-from juggernaut_production.classifications
+from juggernaut_production.classifications;
 -- where -- project_id = 1 and 
 -- application_identifier = 'Galaxy Zoo 2: en';
 -- and created_at between CAST('2009-02-16' AS DATETIME) and CAST('2009-03-16' AS DATETIME)

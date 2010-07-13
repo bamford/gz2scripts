@@ -19,9 +19,9 @@ def make_gz2_hdf5():
         tablefromcsv('../data/final/gz2results.csv', h5file, group,
                      "gz2results", "GZ2 raw results GB",
                      names=names, dtype=dtype)
-        tablefromcsv('../data/final/gz2results_pl_de.csv', h5file, group,
-                     "gz2results_pl_de", "GZ2 raw results PL DE",
-                     names=names, dtype=dtype)
+        #tablefromcsv('../data/final/gz2results_pl_de.csv', h5file, group,
+        #             "gz2results_pl_de", "GZ2 raw results PL DE",
+        #             names=names, dtype=dtype)
         fin = '../data/final/tasks.csv'
         columns = ['task_id', 'question']
         rec = numpy.recfromcsv(fin, names=columns, usecols=(0, 1))

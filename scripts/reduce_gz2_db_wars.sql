@@ -1,7 +1,9 @@
-DELIMITER //
--- *****************************************************************************
-create procedure reduce_wars ()
-begin
+--DELIMITER //
+---- *****************************************************************************
+--create procedure reduce_wars ()
+--begin
+
+use reduction;
 
 -- -- probably already created by reduce
 -- -- select classifications to consider
@@ -53,35 +55,36 @@ from wars_classification_annotations
 join juggernaut_production.asset_classifications on (wars_classification_annotations.classification_id = asset_classifications.classification_id)
 join reduction.user_weights on (user_weights.user_id = wars_classification_annotations.user_id);
 
-drop table if exists `nonwars_classifications`;
-create table `nonwars_classifications` (
-  `classification_id` int(11) primary key,
-  `user_id` int(7) default null,
-  `asset_id` int(7) default null,
-  index (user_id)
-);
-insert into nonwars_classifications
-select distinct classification_id, user_id, asset_id
-from reduction.clicks;
+-- drop table if exists `nonwars_classifications`;
+-- create table `nonwars_classifications` (
+--   `classification_id` int(11) primary key,
+--   `user_id` int(7) default null,
+--   `asset_id` int(7) default null,
+--   index (user_id)
+-- );
+-- insert into nonwars_classifications
+-- select distinct classification_id, user_id, asset_id
+-- from reduction.clicks;
 
--- THIS TAKES WAY TOO LONG - OPTIMISE?
-drop table if exists `wars_match`;
-create table `wars_match` (
-  `wars_classification_id` int(11) primary key,
-  `match_classification_id` int(11) not null,
-  `starter` int(7) default null,
-  `user_id` int(7) default null,
-  `winner` int(7) default null,
-  `loser` int(7) default null
-);
-insert into wars_match
-select W.classification_id, C.classification_id, C.asset_id, W.user_id, W.winner, W.loser
-from (select * from reduction.wars_clicks limit 160000) as W
-join reduction.nonwars_classifications as C on (W.user_id = C.user_id and W.classification_id > C.classification_id)
-left outer join reduction.nonwars_classifications as C2 on
-     (W.user_id = C2.user_id and W.classification_id > C2.classification_id
-      and C.classification_id < C2.classification_id)
-where C2.classification_id is null;
+-- -- THIS TAKES WAY TOO LONG - OPTIMISE?
+-- -- NOW DONE LOCALLY IN PYTHON
+-- drop table if exists `wars_match`;
+-- create table `wars_match` (
+--   `wars_classification_id` int(11) primary key,
+--   `match_classification_id` int(11) not null,
+--   `starter` int(7) default null,
+--   `user_id` int(7) default null,
+--   `winner` int(7) default null,
+--   `loser` int(7) default null
+-- );
+-- insert into wars_match
+-- select W.classification_id, C.classification_id, C.asset_id, W.user_id, W.winner, W.loser
+-- from (select * from reduction.wars_clicks limit 160000) as W
+-- join reduction.nonwars_classifications as C on (W.user_id = C.user_id and W.classification_id > C.classification_id)
+-- left outer join reduction.nonwars_classifications as C2 on
+--      (W.user_id = C2.user_id and W.classification_id > C2.classification_id
+--       and C.classification_id < C2.classification_id)
+-- where C2.classification_id is null;
 
 create table `wars_battles` (
   `classification_id` int(11) primary key,
@@ -100,28 +103,32 @@ select wars_clicks.*, battle_bin
 from wars_clicks
 join juggernaut_production.assets on (winner = assets.id);
 
-create table `wars_count_wins` (
-  `task_id` int(3),
-  `battle_bin` int(7),
-  `asset_id` int(7),
-  `count` int(9),
-  `weight` float(11,2),
-  index (asset_id),
-  index (task_id)
-);
-insert into wars_count_wins
-select
-task_id as task_id,
-battle_bin as battle_bin,
-winner as asset_id,
-count(*) as count,
-sum(weight) as weight
-from wars_clicks
-join juggernaut_production.assets on (winner = assets.id)
-group by task_id, battle_bin, asset_id
-with rollup;
+-- create table `wars_count_wins` (
+--   `task_id` int(3),
+--   `battle_bin` int(7),
+--   `asset_id` int(7),
+--   `count` int(9),
+--   `weight` float(11,2),
+--   index (asset_id),
+--   index (task_id)
+-- );
+-- insert into wars_count_wins
+-- select
+-- task_id as task_id,
+-- battle_bin as battle_bin,
+-- winner as asset_id,
+-- count(*) as count,
+-- sum(weight) as weight
+-- from wars_clicks
+-- join juggernaut_production.assets on (winner = assets.id)
+-- group by task_id, battle_bin, asset_id
+-- with rollup;
 
+SELECT * INTO OUTFILE '/vol/lib/mysql/wars_battles.csv'
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' ESCAPED BY '\\'
+LINES TERMINATED BY '\n'
+FROM wars_battles;
 
-end//
--- *****************************************************************************
-DELIMITER ;
+--end//
+---- *****************************************************************************
+--DELIMITER ;

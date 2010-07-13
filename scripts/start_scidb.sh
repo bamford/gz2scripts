@@ -53,8 +53,10 @@ echo $EC2URL
 #apt-get install xfsprogs
 #mount /vol
 #xfs_growfs /vol
+
 # CHANGE RAM AND DISK SPACE USABLE BY MYSQL
 # see ec2.cnf
+# scp -i GZ.pem scripts/ec2.cnf root@$EC2URL:/etc/mysql/conf.d/
 
 ec2-reboot-instances $EC2INSTANCE
 
