@@ -16,7 +16,7 @@ ec2-run-instances ami-7487651d --instance-type m1.large --availability-zone us-e
 #EC2VOLUME=`ec2-create-volume --size 50 --snapshot snap-6ec77206 --availability-zone us-east-1a | awk '{print $2}'`
 # OR
 # Use volume saved from the previous GZ2 reduction
-EC2VOLUME="vol-8b59e7e2"
+EC2VOLUME="vol-ca1371a3"
 
 EC2STATUS=""
 while [ "$EC2STATUS" != "running" ]

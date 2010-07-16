@@ -7,7 +7,7 @@ import sys
 import time
 import csv
 from h5fromcsv import tablefromcsv
-    
+
 def make_gz2_hdf5():
     filters = tables.Filters(complevel=1, complib='lzo')
     with tables.openFile('../data/final/gz2results.h5', mode = "w",
@@ -145,6 +145,21 @@ def make_gz2_pytables():
         h5file.close()
     #fits2csv.fits2csv_round(outfilename, outfilename.replace('.fits', '.csv.gz'), round=2, gzipped=True)
 
+def update_samples():
+    outfilename = '../data/final/gz2table.h5'
+    h5file = tables.openFile(outfilename, mode = 'r+')
+    table = h5file.root.gz2table
+    old = table.where('(sample == "stripe82_coadd") & (asset_id < 325652)')
+    for row in old:
+        row['sample'] = 'stripe82_coadd_1'
+        row.update()
+    new = table.where('(sample == "stripe82_coadd") & (asset_id >= 325652)')
+    for row in new:
+        row['sample'] = 'stripe82_coadd_2'
+        row.update()
+    h5file.close()
+
+
 def print_status(iid, nids, tstart):
     telapsed = time.clock() - tstart
     ttot = telapsed * (nids / float(iid))
@@ -155,12 +170,37 @@ def print_status(iid, nids, tstart):
     trems = trems - tremm*60
     print 'iid: %i (time remaining = %ih %02im %02is)'%(iid, tremh, tremm, trems)
 
+def h5tosplitcsv(n=10000):
+    #  CASJobs seems to be limited to 10000 rows at a time
+    h5file = tables.openFile('../data/final/gz2table.h5')
+    t = len(h5file.root.gz2table)
+    for i in range(t//n + 1):
+        ii = i*n
+        jj = min(ii+n, t)
+        f = open('../data/final/gz2table-split%03i.csv'%i, 'wb')
+        writer = csv.writer(f)
+        writer.writerow(h5file.root.gz2table.colnames)
+        writer.writerows(h5file.root.gz2table[ii:jj])
+        f.close()
+    h5file.close()
+
 def h5tocsv():
     h5file = tables.openFile('../data/final/gz2table.h5')
     writer = csv.writer(open('../data/final/gz2table.csv', 'wb'))
     writer.writerow(h5file.root.gz2table.colnames)
     writer.writerows(h5file.root.gz2table[:])
+    h5file.close()
 
 def h5tofits():
     h5file = tables.openFile('../data/final/gz2table.h5')
     pyfits.writeto('../data/final/gz2table.fits', h5file.root.gz2table.read())
+    h5file.close()
+
+def upload_to_casjobs():
+    import pyCasJobs
+    from glob import glob
+    import os.path
+    cas = pyCasJobs.CasJobs('bamford', 'LilY5eTs')
+    fnames = glob('../data/final/gz2table-split*.csv')
+    for i, fname in enumerate(fnames):
+        cas.import_table(fname, 'gz2table', tableexists=(i>0))

@@ -27,15 +27,15 @@ thread_stack                      = 192K
 max_connections  = 8
 connect_timeout = 2
 wait_timeout = 60
-tmp_table_size = 2048M           
-max_heap_table_size = 2048M
+tmp_table_size = 512M           
+max_heap_table_size = 512M
 
 sort_buffer_size = 128M
 join_buffer_size = 128M
 
 # Buffer pool size
 
-innodb_buffer_pool_size = 12000M
+innodb_buffer_pool_size = 5000M
 innodb_additional_mem_pool_size   = 32M
 
 # Percentage of unwritten dirty pages not to exceed
