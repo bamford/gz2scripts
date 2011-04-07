@@ -50,6 +50,18 @@ select asset_classifications.asset_id, classification_annotations.*
 from classification_annotations
 join juggernaut_production.asset_classifications on (classification_annotations.classification_id = asset_classifications.classification_id);
 
+drop table last_clicks;
+create table `last_clicks` as
+select user_id, asset_id, max(classification_id) as classification_id
+from clicks
+group by user_id, asset_id;
+
+drop table clean_clicks;
+create table `clean_clicks` like `clicks`;
+insert into clean_clicks
+select clicks.*
+from last_clicks, clicks
+where clicks.classification_id = last_clicks.classification_id;
 
 end//
 -- *****************************************************************************

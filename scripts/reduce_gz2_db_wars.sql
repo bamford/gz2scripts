@@ -40,7 +40,7 @@ create table `wars_clicks` (
   `user_id` int(7) default null,
   `winner` int(7) default null,
   `loser` int(7) default null,
-  `weight` float(3,2) default null,
+  `weight` float(4,3) default null,
   index (user_id),
   index (task_id)
 );
@@ -93,7 +93,7 @@ create table `wars_battles` (
   `user_id` int(7) default null,
   `winner` int(7) default null,
   `loser` int(7) default null,
-  `weight` float(3,2) default null,
+  `weight` float(4,3) default null,
   `battle_bin` int(7),
   index (user_id),
   index (task_id)
@@ -108,7 +108,7 @@ join juggernaut_production.assets on (winner = assets.id);
 --   `battle_bin` int(7),
 --   `asset_id` int(7),
 --   `count` int(9),
---   `weight` float(11,2),
+--   `weight` float(11,3),
 --   index (asset_id),
 --   index (task_id)
 -- );

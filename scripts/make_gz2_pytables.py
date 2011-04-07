@@ -6,6 +6,8 @@ import numpy
 import sys
 import time
 import csv
+import astrotools
+import time
 from h5fromcsv import tablefromcsv
 
 def make_gz2_hdf5():
@@ -15,10 +17,12 @@ def make_gz2_hdf5():
         group = h5file.createGroup('/', 'final', 'Final GZ2 data')
         names = ['objid', 'sample', 'asset_id', 'task_id', 'answer_id',
                    'count', 'weight', 'fraction', 'weighted_fraction']
-        dtype = ['a20', 'a16', 'i4', 'i2', 'i2', 'i2', 'f4', 'f4', 'f4']
+        dtype = ['i8', 'a16', 'i4', 'i2', 'i2', 'i2', 'f4', 'f4', 'f4']
+        # a converter is required to work-around the current bug whereby
+        # numpy badly parses long integers and loses their precision!
         tablefromcsv('../data/final/gz2results.csv', h5file, group,
                      "gz2results", "GZ2 raw results GB",
-                     names=names, dtype=dtype)
+                     names=names, dtype=dtype, converters={0:long})
         #tablefromcsv('../data/final/gz2results_pl_de.csv', h5file, group,
         #             "gz2results_pl_de", "GZ2 raw results PL DE",
         #             names=names, dtype=dtype)
@@ -31,6 +35,12 @@ def make_gz2_hdf5():
         columns = ['answer_id', 'answer', 'task_id']
         rec = numpy.recfromcsv(fin, names=columns, usecols=(0, 1, 3))
         table = h5file.createTable(group, "answers", rec, "GZ2 answers")
+        table.flush()
+
+def add_gz2_info():
+    with tables.openFile('../data/final/gz2table.h5', mode = "r+") as h5file:
+        rec = pyfits.getdata('../gz2sample_final_wvt.fits')
+        table = h5file.createTable("/", "gz2sample", rec, "GZ2 sample")
         table.flush()
 
 def make_gz2_answers():
@@ -47,7 +57,7 @@ def make_gz2_pytables():
         rawh5file = tables.openFile(infilename)
         answers = rawh5file.root.final.taskanswers
         dall = rawh5file.root.final.gz2results
-        outfilename = '../data/final/gz2table.h5'
+        outfilename = '../data/final/gz2table_new.h5'
         filters = tables.Filters(complevel=1, complib='lzo')
         h5file = tables.openFile(outfilename, mode = "w", title = "GZ2 results table",
                                  filters=filters)
@@ -62,8 +72,9 @@ def make_gz2_pytables():
             if ti == 0:
                 for c in ('objid', 'sample', 'asset_id'):
                     columns.append((c, dall.coldtypes[c]))
-                columns.append(('total_count', numpy.int))
-                columns.append(('total_weight', numpy.float))
+                columns.append(('objid_str', 'S20'))
+                columns.append(('total_count', numpy.int16))
+                columns.append(('total_weight', numpy.float32))
             #print answers.description
             for a in task_answers:
                 task = a['task']
@@ -72,8 +83,8 @@ def make_gz2_pytables():
                 for c in ('count', 'weight', 'fraction', 'weighted_fraction'):
                     colname = 't%02i_%s_a%02i_%s_%s'%(t, task, aid, answer, c)
                     columns.append((colname, dall.coldtypes[c]))
-            columns.append(('t%02i_%s_total_count'%(t, task), numpy.int))
-            columns.append(('t%02i_%s_total_weight'%(t, task),numpy.float))
+            columns.append(('t%02i_%s_total_count'%(t, task), numpy.int16))
+            columns.append(('t%02i_%s_total_weight'%(t, task), numpy.float32))
         #print numpy.sort([i for i, j in columns])
         table = h5file.createTable("/", "gz2table", numpy.recarray((0,), dtype=columns),
                                    "GZ2 results table", expectedrows=nids)
@@ -125,6 +136,7 @@ def make_gz2_pytables():
                             first_task = False
                             for c in ('objid', 'sample', 'asset_id'):
                                 row[c] = d[c][0]
+                            row['objid_str'] = str(d['objid'][0])
                         row['t%02i_%s_total_count'%(t, task)] = numpy.sum(x['count']
                                                                           for x in d_task)
                         row['t%02i_%s_total_weight'%(t, task)] = numpy.sum(x['weight']
@@ -146,7 +158,7 @@ def make_gz2_pytables():
     #fits2csv.fits2csv_round(outfilename, outfilename.replace('.fits', '.csv.gz'), round=2, gzipped=True)
 
 def update_samples():
-    outfilename = '../data/final/gz2table.h5'
+    outfilename = '../data/final/gz2table_new.h5'
     h5file = tables.openFile(outfilename, mode = 'r+')
     table = h5file.root.gz2table
     old = table.where('(sample == "stripe82_coadd") & (asset_id < 325652)')
@@ -170,7 +182,7 @@ def print_status(iid, nids, tstart):
     trems = trems - tremm*60
     print 'iid: %i (time remaining = %ih %02im %02is)'%(iid, tremh, tremm, trems)
 
-def h5tosplitcsv(n=10000):
+def h5tosplitcsv(n=5000):
     #  CASJobs seems to be limited to 10000 rows at a time
     h5file = tables.openFile('../data/final/gz2table.h5')
     t = len(h5file.root.gz2table)
@@ -192,8 +204,8 @@ def h5tocsv():
     h5file.close()
 
 def h5tofits():
-    h5file = tables.openFile('../data/final/gz2table.h5')
-    pyfits.writeto('../data/final/gz2table.fits', h5file.root.gz2table.read())
+    h5file = tables.openFile('../data/final/gz2table_new.h5')
+    pyfits.writeto('../data/final/gz2table_new.fits', h5file.root.gz2table.read())
     h5file.close()
 
 def upload_to_casjobs():
@@ -203,4 +215,6 @@ def upload_to_casjobs():
     cas = pyCasJobs.CasJobs('bamford', 'LilY5eTs')
     fnames = glob('../data/final/gz2table-split*.csv')
     for i, fname in enumerate(fnames):
-        cas.import_table(fname, 'gz2table', tableexists=(i>0))
+        print fname
+        cas.import_table(fname, 'gz2table_v3', tableexists=(i>0))
+        time.sleep(1)

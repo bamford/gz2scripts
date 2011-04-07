@@ -128,7 +128,7 @@ FROM gz2_coadd_s82_stage4 as G, gz2_bestspec_s82 as B
 INTO gz2_coadd_s82_stage5
 WHERE G.objid = B.objid AND B.best = 1
 
--- select objects brighter than r = 19 and larger than 3 arcsec
+-- select objects brighter than r = 17.77 and larger than 3 arcsec
 GO
 SELECT *
 INTO gz2_coadd_s82

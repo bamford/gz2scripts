@@ -15,8 +15,11 @@ ec2-run-instances ami-7487651d --instance-type m1.large --availability-zone us-e
 # Create a volume from the GZ2 database snapshot
 #EC2VOLUME=`ec2-create-volume --size 50 --snapshot snap-6ec77206 --availability-zone us-east-1a | awk '{print $2}'`
 # OR
+# Use the saved reduction snapshot
+#ECVOLUME2=`ec2-create-volume --snapshot snap-24c7c24f --availability-zone us-east-1a | awk '{print $2}'`
+# OR
 # Use volume saved from the previous GZ2 reduction
-EC2VOLUME="vol-ca1371a3"
+#EC2VOLUME=""
 
 EC2STATUS=""
 while [ "$EC2STATUS" != "running" ]
@@ -58,9 +61,14 @@ echo $EC2URL
 # see ec2.cnf
 # scp -i GZ.pem scripts/ec2.cnf root@$EC2URL:/etc/mysql/conf.d/
 
-ec2-reboot-instances $EC2INSTANCE
+#ec2-reboot-instances $EC2INSTANCE
+#sleep 30
 
-sleep 30
+#ssh -i GZ.pem root@$EC2URL
+#/etc/init.d/mysql start
+
+# UPLOAD/UPDATE SCRIPTS
+rsync -a -e'ssh -i GZ.pem' scripts/*.sql root@$EC2URL:/vol/scripts/
 
 # To access database remotely:
 # mysql5 -A -u zoodb -p -h $EC2URL juggernaut_production

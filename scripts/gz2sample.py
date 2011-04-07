@@ -8,6 +8,8 @@ import cosmology
 import time
 from glob import glob
 from combine_fits_tables import concatenate_fits_tables
+import csv
+import StringIO
 
 import gc
 gc.collect()
@@ -43,6 +45,15 @@ def concatenate_dr7_tables():
     files = glob(data_path+'gz2sample_final_dr7*wvt.fits')
     tables = [[pyfits.open(f)['data']] for f in files]
     concatenate_fits_tables(tables, data_path+'gz2sample_final_dr7_wvt.fits')
+
+def concatenate_gz2_tables():
+    files = [data_path+'gz2sample_final_dr7_wvt.fits',
+             data_path+'gz2sample_final_stripe82_coadd_abs_regions_counts_wvt.fits']
+    tables = [[pyfits.open(f)[1]] for f in files]
+    outfile = data_path+'gz2sample_final_wvt.fits'
+    concatenate_fits_tables(tables, outfile, uniquecol='objid')
+    csvfile = csvfile.replace('.fits', '.csv')
+    fits2csv(outfile, csvfile)
 
 def do_all(name='final', coadd=False):
     # starting with gz2sample_final.fits from CAS
@@ -547,3 +558,31 @@ def make_abs_cas_table(sname='final'):
     fits2csv(outfile, csvfile)
     os.remove(outfile)
     #os.system('gzip %s &'%csvfile)
+
+def fitstosplitcsv(n=10000):
+    #  CASJobs seems to be limited to 10000 rows at a time
+    data = pyfits.getdata(data_path+'gz2sample_final_wvt.fits')
+    t = len(data)
+    for i in range(t//n + 1):
+        ii = i*n
+        jj = min(ii+n, t)
+        f = open('../data/final/gz2sample-split%03itmp.csv'%i, 'wb')
+        writer = csv.writer(f)
+        writer.writerow(data.names)
+        writer.writerows(data[ii:jj])
+        f.close()
+        fin = open('../data/final/gz2sample-split%03itmp.csv'%i)
+        fout = open('../data/final/gz2sample-split%03i.csv'%i, 'w')
+        for l in fin:
+            fout.write(l.replace('nan', '-9999'))
+        fout.close()
+        fin.close()
+
+def upload_to_casjobs():
+    import pyCasJobs
+    from glob import glob
+    import os.path
+    cas = pyCasJobs.CasJobs('bamford', 'LilY5eTs')
+    fnames = glob('../data/final/gz2sample-split*.csv')
+    for i, fname in enumerate(fnames):
+        cas.import_table(fname, 'gz2sample_new', tableexists=(i>0))

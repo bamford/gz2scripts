@@ -13,16 +13,16 @@ create table `click_counts` (
   `task_id` int(3),
   `answer_id` int(3),
   `count` int(5),
-  `weight` float(7,2),
+  `weight` float(8,3),
   index (asset_id),
   index (task_id)
 );
 insert into click_counts
 select asset_id as asset_id, task_id as task_id, answer_id as answer_id,
        count(*) as count, sum(user_weights.weight) as weight
-from reduction.clicks
-join user_weights on (user_weights.user_id = clicks.user_id)
-where clicks.answer_id is not null
+from reduction.clean_clicks as C
+join user_weights on (user_weights.user_id = C.user_id)
+where C.answer_id is not null
 group by asset_id, task_id, answer_id
 with rollup;
 
@@ -32,7 +32,7 @@ create table `click_totals` (
   `task_id` int(3) not null,
   `answer_id` int(3) default null,
   `count` int(5) default null,
-  `weight` float(7,2) default null,
+  `weight` float(8,3) default null,
   index (asset_id),
   index (task_id)
 );
@@ -47,9 +47,9 @@ create table `click_fractions` (
   `task_id` int(3) not null,
   `answer_id` int(3) default null,
   `count` int(5) default null,
-  `weight` float(3,2) default null,
-  `fraction` float(3,2) default null,
-  `weighted_fraction` float(3,2) default null,
+  `weight` float(8,3) default null,
+  `fraction` float(4,3) default null,
+  `weighted_fraction` float(4,3) default null,
   index (asset_id),
   index (task_id)
 );
@@ -68,7 +68,7 @@ create table `click_consistency` (
   `asset_id` int(7) not null,
   `task_id` int(3) not null,
   `user_id` int(7) not null,
-  `consistency` float(3,2) default null,
+  `consistency` float(4,3) default null,
   index (asset_id),
   index (task_id),
   index (user_id)
@@ -76,7 +76,7 @@ create table `click_consistency` (
 insert into click_consistency
 select C.annotation_id, C.asset_id, C.task_id, MIN(C.user_id) as user_id,
        AVG(2*(C.answer_id = F.answer_id)*(weighted_fraction - 0.5) + 1.0 - weighted_fraction) as consistency
-from reduction.clicks as C,
+from reduction.clean_clicks as C,
 click_fractions as F
 where C.task_id = F.task_id
 and C.asset_id = F.asset_id
@@ -86,8 +86,8 @@ drop table if exists `click_fraction_consistency`;
 create table `click_fraction_consistency` (
   `asset_id` int(7) not null,
   `task_id` int(3) not null,
-  `average` float(3,2) default null,
-  `stddev` float(3,2) default null,
+  `average` float(4,3) default null,
+  `stddev` float(4,3) default null,
   index (asset_id),
   index (task_id)
 );
@@ -99,18 +99,19 @@ group by asset_id, task_id;
 drop table if exists `user_consistency`;
 create table `user_consistency` (
   `user_id` int(7) primary key,
-  `average` float(3,2),
-  `stddev` float(3,2),
+  `average` float(4,3),
+  `stddev` float(4,3),
   `num_classifications` int(7)
 );
 insert into user_consistency
-select user_id, avg(consistency) as average, stddev(consistency) as stddev, count(*) as num_classifications
+select user_id, avg(consistency) as average, stddev(consistency) as stddev,
+       count(*) as num_classifications
 from click_consistency
 group by user_id;
 
 drop table if exists click_fraction_consistency_histo;
 create table click_fraction_consistency_histo
-select average as rounded_consistency, count(*) as count
+select round(average, 2) as rounded_consistency, count(*) as count
 from click_fraction_consistency group by rounded_consistency;
 
 drop table if exists click_fraction_consistency_cumhisto;
@@ -123,7 +124,8 @@ group by b.rounded_consistency;
 
 drop table if exists user_consistency_histo;
 create table user_consistency_histo
-select average as rounded_consistency, count(*) as count, avg(num_classifications) as avg_num_classifications
+select round(average, 2) as rounded_consistency,
+       count(*) as count, avg(num_classifications) as avg_num_classifications
 from user_consistency group by rounded_consistency;
 
 drop table if exists user_consistency_cumhisto;
