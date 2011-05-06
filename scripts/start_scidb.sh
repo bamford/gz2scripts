@@ -9,7 +9,10 @@
 sleep 30
 
 # Use a normal instance
-ec2-run-instances ami-7487651d --instance-type m1.large --availability-zone us-east-1a --key GZ --group db
+# Used to use ami-7487651d, which is now depreciated
+# Try latest official ubuntu image: ami-08f40561
+
+ec2-run-instances ami-08f40561 --instance-type m1.large --availability-zone us-east-1a --key GZ --group db
 #ec2-run-instances ami-7487651d --instance-type m2.xlarge --availability-zone us-east-1a --key GZ --group db
 
 # Create a volume from the GZ2 database snapshot
@@ -19,7 +22,7 @@ ec2-run-instances ami-7487651d --instance-type m1.large --availability-zone us-e
 #ECVOLUME2=`ec2-create-volume --snapshot snap-24c7c24f --availability-zone us-east-1a | awk '{print $2}'`
 # OR
 # Use volume saved from the previous GZ2 reduction
-#EC2VOLUME=""
+#EC2VOLUME="vol-ca1371a3"
 
 EC2STATUS=""
 while [ "$EC2STATUS" != "running" ]
@@ -50,6 +53,9 @@ done
 EC2URL=`ec2-describe-instances $EC2INSTANCE | grep INSTANCE | awk '{print $4}'`
 echo $EC2URL
 
+# apt-get update
+# apt-get upgrade
+# apt-get install mysql-server emacs23-nox
 
 # RESIZE PARTITION IF VOLUME CREATED FROM ORIGINAL SNAPSHOT
 #ssh -i GZ.pem root@$EC2URL
@@ -59,7 +65,7 @@ echo $EC2URL
 
 # CHANGE RAM AND DISK SPACE USABLE BY MYSQL
 # see ec2.cnf
-# scp -i GZ.pem scripts/ec2.cnf root@$EC2URL:/etc/mysql/conf.d/
+# scp -i GZ.pem scripts/ec2.cnf ubuntu@$EC2URL:/etc/mysql/conf.d/
 
 #ec2-reboot-instances $EC2INSTANCE
 #sleep 30
