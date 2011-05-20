@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 import time
 import numpy
 import cProfile as profile
@@ -35,7 +37,9 @@ def wars_sort_swap(galaxies, winners, losers, niter=32, damped=True, progressive
                     sorted[il] = w
                     sorted[iw] = l
                 nswap += 1
-        nchanged = len((previous != sorted).nonzero()[0])        
+        nchanged = len((previous != sorted).nonzero()[0])
+        if nchanged == 0:
+            break
         #print 'niter = %4i:  nswap = %4i,  nchanged = %4i'%(i, nswap, nchanged)
         if len(numpy.unique(sorted)) != len(sorted):
             print 'NOT UNIQUE!'
@@ -66,14 +70,16 @@ def wars_sort_test(fn, wrong=0.0, ntime=5, niter=1, damped=False, progressive_da
     s = numpy.median(bias)
     #print 'MAD = %5.2f'%m
     #print 'time = %5.2f'%t
-    #pylab.plot(correct, result, '.')
-    #pylab.plot([0.0, ngal], [0.0, ngal], '-')
+    pylab.figure()
+    pylab.plot(correct, galaxies, 'r.')
+    pylab.plot(correct, result, 'g.')
+    pylab.plot([0.0, ngal], [0.0, ngal], '-')
     return m, s, t
 
 wars_sorts = (wars_sort_swap,)
 
 if __name__ == '__main__':
-    numpy.random.seed(12345)
+    numpy.random.seed()
     ngal=200
     nwars=2000
     galaxies = numpy.random.permutation(ngal)
@@ -83,16 +89,16 @@ if __name__ == '__main__':
     for fn in wars_sorts:
         print fn.__name__
         print '%5s %5s %8s %11s %8s %5s %5s %5s'%('wrong', 'niter', 'damped', 'progressive', 'dfactor', 'mad%', 'bias%', 'time')
-        for wrong in (0.02, 0.04, 0.08):
-            for niter in (32, 64):
-                for damped in (True,):
-                    for progressive in (True,):
+        for wrong in (0.00, 0.05, 0.10):
+            for niter in (32, 64, 128):
+                for damped in (False,):
+                    for progressive in (False,):
                         if (not damped) and progressive: continue
-                        for dfactor in numpy.arange(0.5, 10.1, 0.5):
+                        for dfactor in numpy.arange(0.0, 0.1):
                             m, s, t = wars_sort_test(fn, wrong=wrong, niter=niter, damped=damped,
                                                      progressive_damping=progressive, dfactor=dfactor)
-                            print '%5.2f %5i %8s %11s %8.2f %5.1f %5.2f %5.2f'%(wrong, niter, damped, progressive, dfactor, m, s, t)
-    
+                            print '%5.2f %5i %8s %11s %8.2f %5.2f %5.2f %5.2f'%(wrong, niter, damped, progressive, dfactor, m, s, t)
+                        pylab.show()
 
 def do_wars_sort():
     winners = []

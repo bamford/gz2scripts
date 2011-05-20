@@ -10,9 +10,24 @@ import astrotools
 import time
 from collections import deque
 from h5fromcsv import tablefromcsv
+from tempfile import mktemp
+import os
+
+def do_all():
+    #make_gz2_hdf5()
+    #make_gz2_answers()
+    #make_gz2_pytables()
+    #update_samples()
+    #add_gz2_wars()
+    #make_gz2_wars()
+    #add_gz2_clicks()
+    make_gz2_prewars()
+    make_gz2_wars_indexes()
+    make_gz2_wars_full()    
+    
 
 def make_gz2_hdf5():
-    filters = tables.Filters(complevel=1, complib='lzo')
+    filters = tables.Filters(complevel=1, complib='blosc')
     with tables.openFile('../data/final/gz2results.h5', mode = "w",
                          title = "GZ2 raw results", filters=filters) as h5file:
         group = h5file.createGroup('/', 'final', 'Final GZ2 data')
@@ -83,25 +98,53 @@ def make_gz2_prewars():
         except tables.NodeError:
             pass
         # select has a spiral:
-        spiralprewars = clicks.readWhere('(user_id != 4) & (answer_id == 8)',
-                                         field=['user_id', 'classification_id',
-                                                'asset_id'])
+        spiralprewars = clicks.readWhere('(user_id != 4) & (answer_id == 8)')
         h5file.createTable("/prewars", "spiral", spiralprewars,
                            "GZ2 prewar spiral standard classifications",
                            expectedrows=0.05*len(clicks),
                            createparents=True)
         # select has a bar:
-        barprewars = clicks.readWhere('(user_id != 4) & (answer_id == 6)',
-                                      field=['user_id', 'classification_id',
-                                             'asset_id'])
+        barprewars = clicks.readWhere('(user_id != 4) & (answer_id == 6)')
         h5file.createTable("/prewars", "bar", barprewars,
                            "GZ2 prewar bar standard classifications",
                            expectedrows=0.05*len(clicks))
         h5file.flush()
 
 
+def make_gz2_wars_indexes():
+    try:
+        infilename = '../data/final/gz2results.h5'
+        rawh5file = tables.openFile(infilename, mode = "r+")
+        spiralwars = rawh5file.root.wars.spiral
+        barwars = rawh5file.root.wars.bar
+        spiralprewars = rawh5file.root.prewars.spiral
+        barprewars = rawh5file.root.prewars.bar
+        spiralwars.cols.user_id.removeIndex()
+        spiralwars.cols.user_id.createCSIndex()
+        barwars.cols.user_id.removeIndex()
+        barwars.cols.user_id.createCSIndex()
+        spiralprewars.cols.user_id.removeIndex()
+        spiralprewars.cols.user_id.createCSIndex()
+        barprewars.cols.user_id.removeIndex()
+        barprewars.cols.user_id.createCSIndex()
+        spiralwars.cols.classification_id.removeIndex()
+        spiralwars.cols.classification_id.createCSIndex()
+        barwars.cols.classification_id.removeIndex()
+        barwars.cols.classification_id.createCSIndex()
+        spiralprewars.cols.classification_id.removeIndex()
+        spiralprewars.cols.classification_id.createCSIndex()
+        barprewars.cols.classification_id.removeIndex()
+        barprewars.cols.classification_id.createCSIndex()
+        spiralprewars.cols.asset_id.removeIndex()
+        spiralprewars.cols.asset_id.createCSIndex()
+        barprewars.cols.asset_id.removeIndex()
+        barprewars.cols.asset_id.createCSIndex()
+
+    finally:
+        rawh5file.close()
+
+
 def make_gz2_wars_full():
-    # TURN ON PYTABLES PRO INDEXING
     try:
         infilename = '../data/final/gz2results.h5'
         rawh5file = tables.openFile(infilename)
@@ -117,6 +160,8 @@ def make_gz2_wars_full():
                             ('user_id', 'i4'), ('starter', 'i4'),
                             ('winner', 'i4'), ('loser', 'i4'),
                             ('weight', 'f4'), ('battle_bin', 'i4')])
+        tmpfilename = mktemp()
+        tmph5file = tables.openFile(tmpfilename, mode = "w")
         try:
             h5file.removeNode('/gz2spiralwars', recursive=True)
         except tables.NodeError:
@@ -131,53 +176,82 @@ def make_gz2_wars_full():
         bartable = h5file.createTable("/", "gz2barwars", dtype,
                 "GZ2 bar wars results matched to standard classifications",
                 expectedrows=len(barwars))
-        nomatch = 0
-        count = 0
-        latest = 0
         for warcombos in [(spiralwars, spiralprewars, spiraltable),
                          (barwars, barprewars, bartable)]:
+            nomatch = 0
+            count = 0
             wars, prewars, table = warcombos
+            try:
+                h5file.removeNode('/unmatchedwars')
+            except tables.NodeError:
+                pass
+            #remainingwars = wars.copy(tmph5file.root, "unmatchedwars", sortby='classification_id')
+            #remainingwars.cols.user_id.createIndex(kind='light')
+            #remainingwars.cols.classification_id.createIndex(kind='light')
+            #remainingwars.autoIndex = False
+            remainingwars = wars
+            try:
+                h5file.removeNode('/unmatchedprewars')
+            except tables.NodeError:
+                pass
+            #remainingprewars = prewars.copy(tmph5file.root, "unmatchedprewars", sortby='classification_id')
+            #remainingprewars.cols.user_id.createIndex(kind='light')
+            #remainingprewars.cols.classification_id.createIndex(kind='light')
+            #remainingprewars.autoIndex = False
+            remainingprewars = prewars
             nwars = len(wars)
             hwars = nwars / 3600
             print nwars, len(prewars)
             d1 = d2 = d3 = d4 = d5 = 0
+            war_rowstoremove = []
+            prewar_rowstoremove = []
             for w in wars:
-                if count % 10 == 0:
+                if count % 1000 == 0:
                     print w['classification_id'], count, len(table), nomatch
-                    print 'timings: %.5f %.5f %.5f %.5f %.5f'%(d1*hwars, d2*hwars, d3*hwars, d4*hwars, d5*hwars)
+                    print 'timings: %.5f (%.5f %.5f %.5f %.5f %.5f)'%((d1+d2+d3+d4+d5)*hwars,
+                                                                      d1*hwars, d2*hwars, d3*hwars, d4*hwars, d5*hwars)
                 count += 1
                 # Find id of previous war of this type for this user.
                 # By restricting our search for prewar clicks to
-                # subsequent ids we will fail to get matches for duplicate
+                # subsequent ids we will avoid matches for duplicate
                 # clicks, as desired.
                 t = time.clock()
-                prevwarids = wars.where('(user_id == uid)',
-                                        {'uid': w['user_id']},
-                                        start=0, stop=w.nrow)
+                prevwarids = remainingwars.where('(user_id == uid) & ((classification_id < cid))',
+                                                 {'uid': w['user_id'], 'cid': w['classification_id']})
                 d1 = (time.clock() - t)/count + d1*(count-1)/count
                 prevwarid = {'classification_id': 0}
                 t = time.clock()
-                for prevwarid in prevwarids: pass # get last value from iterator
+                for prevwarid in prevwarids:
+                    #war_rowstoremove.append(prevwarid.nrow)
+                    pass # get last value from iterator
+                #if len(war_rowstoremove) > 1000:
+                #    print 'Removing used war rows'
+                #    for row in war_rowstoremove:
+                #        # remove old wars from table                
+                #        remainingwars.removeRows(row)
+                #    remainingwars.reIndexDirty()
+                #    war_rowstoremove = []
                 d2 = (time.clock() - t)/count + d2*(count-1)/count
                 t = time.clock()
-                matches = prewars.where('(user_id == uid) & (classification_id < cid) & (classification_id > pid)', {'uid': w['user_id'], 'cid': w['classification_id'], 'pid': prevwarid['classification_id']}, stop=latest+10000)
-                #matches = prewars.where('(user_id == uid) & (classification_id > pid)', {'uid': w['user_id'], 'pid': prevwarid['classification_id']})
+                matches = remainingprewars.where('((user_id == uid) & ((asset_id == winner) | (asset_id == loser))) & ((classification_id > pid) & (classification_id < cid))',
+                                                 {'uid': w['user_id'], 'pid': prevwarid['classification_id'], 'cid': w['classification_id'],
+                                                  'winner': w['winner'], 'loser': w['loser']})
                 d3 = (time.clock() - t)/count + d3*(count-1)/count
                 last = None
                 t = time.clock()
-                mlist = []
                 for last in matches:
-                    #if last['classification_id'] >= w['classification_id']:
-                    #    break
-                    #mlist.append(m.nrow)
+                    #prewar_rowstoremove.append(last.nrow)
                     pass # get last value from iterator
-                #print mlist
-                #if len(mlist) > 0:
-                #    last = prewars.read(mlist[-1])
+                #if len(prewar_rowstoremove) > 1000:
+                #    print 'Removing used prewar rows'
+                #    for row in prewar_rowstoremove:
+                #        # remove old prewars from table                
+                #        remainingprewars.removeRows(row)
+                #    remainingprewars.reIndexDirty()
+                #    prewar_rowstoremove = []
                 d4 = (time.clock() - t)/count + d4*(count-1)/count
                 t = time.clock()
                 if last is not None:
-                    latest = max(latest, last.nrow)
                     last = last.fetch_all_fields()
                     row = [(w['classification_id'],
                             last['classification_id'],
@@ -194,6 +268,9 @@ def make_gz2_wars_full():
     finally:
         rawh5file.close()
         h5file.close()
+        tmph5file.close()
+        os.remove(tmpfilename)
+        
 
 def add_gz2_info():
     with tables.openFile('../data/final/gz2table.h5', mode = "r+") as h5file:
@@ -216,7 +293,7 @@ def make_gz2_pytables():
         answers = rawh5file.root.final.taskanswers
         dall = rawh5file.root.final.gz2results
         outfilename = '../data/final/gz2table.h5'
-        filters = tables.Filters(complevel=1, complib='lzo')
+        filters = tables.Filters(complevel=1, complib='blosc')
         h5file = tables.openFile(outfilename, mode = "w", title = "GZ2 results table",
                                  filters=filters)
         asset_id_list = dall.col('asset_id')
@@ -359,11 +436,19 @@ def h5tocsv():
     writer = csv.writer(open('../data/final/gz2table.csv', 'wb'))
     writer.writerow(h5file.root.gz2table.colnames)
     writer.writerows(h5file.root.gz2table[:])
+    writer = csv.writer(open('../data/final/gz2spiralwars.csv', 'wb'))
+    writer.writerow(h5file.root.gz2spiralwars.colnames)
+    writer.writerows(h5file.root.gz2spiralwars[:])
+    writer = csv.writer(open('../data/final/gz2barwars.csv', 'wb'))
+    writer.writerow(h5file.root.gz2barwars.colnames)
+    writer.writerows(h5file.root.gz2barwars[:])
     h5file.close()
 
 def h5tofits():
     h5file = tables.openFile('../data/final/gz2table.h5')
     pyfits.writeto('../data/final/gz2table.fits', h5file.root.gz2table.read())
+    pyfits.writeto('../data/final/gz2spiralwars.fits', h5file.root.gz2spiralwars.read())
+    pyfits.writeto('../data/final/gz2barwars.fits', h5file.root.gz2barwars.read())
     h5file.close()
 
 def upload_to_casjobs():

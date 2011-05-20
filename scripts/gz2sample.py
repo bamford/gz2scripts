@@ -64,7 +64,7 @@ def do_all(name='final', coadd=False):
     add_bins(name)
     add_bin_counts(name)
     # run wvt_gz2.pro in IDL if bin defining sample
-    #plot_all_wvt(coadd, name)
+    #plot_all_wvt(name, coadd)
     add_wvt(name, coadd)
     make_db_table(name)
 
@@ -371,6 +371,8 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', sname='final', logplot=False):
         d = N.log10(d)
         d[mask] = bg_count
     fn = fd.replace('_bins', '_nodes')
+    fn = fn.replace('_density_all', '_nodes')
+    fn = fn.replace('_counts_all', '_nodes')
     nodes = pyfits.getdata(fn)
     nodes = nodes[zbin]
     nodes = nodes[:,(nodes[0] > 0.001) & (nodes[1] > 0.001)]    
@@ -378,7 +380,8 @@ def plot_wvt(zbin=5, fname='gz2_wvt_bins', sname='final', logplot=False):
     nodes[1] = (nodes[1] + 0.5) * bin_step + bin_min
     bin_min, bin_max, bin_step = bins['petroR50_r_kpc']
     nodes[0] = (nodes[0] + 0.5) * bin_step + bin_min
-    f = data_path+'gz2sample_%s_abs_regions_counts.fits'%sname
+    #f = data_path+'gz2sample_%s_abs_regions_counts.fits'%sname  # before add_wvt
+    f = data_path+'gz2sample_%s_abs_regions_counts_wvt.fits'%sname  # after add_wvt
     p = pyfits.open(f)
     zbins = p['redshift_simple_bins'].data
     magbins = p['petroMag_Mr_simple_bins'].data
