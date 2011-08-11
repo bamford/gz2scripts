@@ -167,7 +167,7 @@ def make_gz2_wars_full():
         except tables.NodeError:
             pass
         spiraltable = h5file.createTable("/", "gz2spiralwars", dtype,
-                "GZ2 bar wars results matched to standard classifications",
+                "GZ2 spiral wars results matched to standard classifications",
                 expectedrows=len(spiralwars))
         try:
             h5file.removeNode('/gz2barwars', recursive=True)
@@ -270,8 +270,148 @@ def make_gz2_wars_full():
         h5file.close()
         tmph5file.close()
         os.remove(tmpfilename)
-        
 
+def add_gz2_wars_bins():
+    with tables.openFile('../data/final/gz2table.h5', mode = "r+") as h5file:
+        spiralwars = h5file.root.gz2spiralwars
+        barwars = h5file.root.gz2barwars
+        info = h5file.root.gz2sample
+        results = h5file.root.gz2table
+        results.cols.asset_id.removeIndex()
+        results.cols.asset_id.createCSIndex()
+        info.cols.OBJID.removeIndex()
+        info.cols.OBJID.createCSIndex()
+        dtype = numpy.dtype([('wars_classification_id', 'i4'),
+                             ('match_classification_id', 'i4'),
+                             ('annotation_id', 'i4'), ('task_id', 'i2'),
+                             ('user_id', 'i4'), ('starter_asset_id', 'i4'),
+                             ('winner_asset_id', 'i4'), ('loser_asset_id', 'i4'),
+                             ('weight', 'f4'), ('battle_bin', 'i4'),
+                             ('winner_redshift_bin', 'i4'), ('winner_magsize_bin', 'i4'),
+                             ('winner_sample', 'a16'), ('winner_coadd', 'i2'),
+                             ('winner_battle_bin', 'i4'),
+                             ('loser_redshift_bin', 'i4'), ('loser_magsize_bin', 'i4'),
+                             ('loser_sample', 'a16'), ('loser_coadd', 'i2'),
+                             ('loser_battle_bin', 'i4'),
+                             ('winner_objid', 'i8'), ('loser_objid', 'i8')])
+        try:
+            h5file.removeNode('/gz2spiralwarsbins', recursive=True)
+        except tables.NodeError:
+            pass
+        spiraltable = h5file.createTable("/", "gz2spiralwarsbins", dtype,
+                "GZ2 spiral wars results matched to standard classifications with bins",
+                expectedrows=spiralwars.nrows)
+        try:
+            h5file.removeNode('/gz2barwarsbins', recursive=True)
+        except tables.NodeError:
+            pass
+        bartable = h5file.createTable("/", "gz2barwarsbins", dtype,
+                "GZ2 bar wars results matched to standard classifications with bins",
+                expectedrows=barwars.nrows)
+        for warcombos in [(spiralwars, spiraltable),
+                         (barwars, bartable)]:
+            wars, table = warcombos
+            count = 0
+            nmismatch = 0
+            print len(wars)
+            for w in wars:
+                winnerresults = results.readWhere('asset_id == %i' % w['winner'])
+                loserresults = results.readWhere('asset_id == %i' % w['loser'])
+                matchcount = len(winnerresults)
+                winnerresult = winnerresults[0]
+                if matchcount != 1:
+                    print count, 'Matchcount != 1 for winnerresults!'
+                matchcount = len(loserresults)
+                loserresult = loserresults[0]
+                if matchcount != 1:
+                    print count, 'Matchcount != 1 for loserresults!'
+                winnerobjid = winnerresult['objid']
+                loserobjid = loserresult['objid']
+                winnerinfos = info.readWhere('OBJID == id', {'id': winnerobjid})
+                loserinfos = info.readWhere('OBJID == id', {'id': loserobjid})
+                matchcount = len(winnerinfos)
+                winnerinfo = winnerinfos[0]
+                if matchcount != 1:
+                    print count, 'Matchcount != 1 for winnerinfos!'
+                matchcount = len(loserinfos)
+                loserinfo = loserinfos[0]
+                if matchcount != 1:
+                    print count, 'Matchcount != 1 for loserinfos!'
+                winner_redshift_bin = winnerinfo['REDSHIFT_SIMPLE_BIN']
+                winner_magsize_bin = winnerinfo['WVT_BIN']
+                loser_redshift_bin = loserinfo['REDSHIFT_SIMPLE_BIN']
+                loser_magsize_bin = loserinfo['WVT_BIN']
+                winner_sample = winnerresult['sample']
+                loser_sample = loserresult['sample']
+                winner_coadd = int('coadd' in winner_sample)
+                loser_coadd = int('coadd' in loser_sample)
+                winner_battle_bin = winner_coadd * 1000000 + winner_magsize_bin * 1000 + winner_redshift_bin
+                loser_battle_bin = loser_coadd * 1000000 + loser_magsize_bin * 1000 + loser_redshift_bin
+                mismatch = winner_battle_bin != loser_battle_bin
+                if mismatch: nmismatch += 1
+                if count%1000 == 0 or mismatch:
+                    print count, w['winner'], w['loser'], winnerobjid, loserobjid,
+                    print winner_sample, loser_sample, winner_coadd, loser_coadd,
+                    print winner_battle_bin, loser_battle_bin, nmismatch, w['battle_bin']
+                row = [tuple(list(w.fetch_all_fields()) +
+                       [winner_redshift_bin, winner_magsize_bin,
+                        winner_sample, winner_coadd, winner_battle_bin,
+                        loser_redshift_bin, loser_magsize_bin,
+                        loser_sample, loser_coadd, loser_battle_bin,
+                        winnerobjid, loserobjid])]
+                table.append(row)
+                count += 1                
+        h5file.flush()
+
+def make_gz2_wars_ok():
+    with tables.openFile('../data/final/gz2table.h5', mode = "r+") as h5file:
+        spiralwars = h5file.root.gz2spiralwarsbins
+        barwars = h5file.root.gz2barwarsbins
+        dtype = numpy.dtype([('wars_classification_id', 'i4'),
+                             ('match_classification_id', 'i4'),
+                             ('annotation_id', 'i4'), ('task_id', 'i2'),
+                             ('user_id', 'i4'), ('starter_asset_id', 'i4'),
+                             ('winner_asset_id', 'i4'), ('loser_asset_id', 'i4'),
+                             ('winner_objid', 'i8'), ('loser_objid', 'i8'),
+                             ('winner_sample', 'a16'), ('loser_sample', 'a16'),
+                             ('redshift_bin', 'i4'), ('magsize_bin', 'i4'),
+                             ('battle_bin', 'i4')])
+                             #('weight', 'f4'),
+                             #('battle_bin', 'i4'),
+                             #('winner_sample', 'a16'), ('winner_coadd', 'i2'),
+                             #('loser_redshift_bin', 'i4'), ('loser_magsize_bin', 'i4'),
+                             #('loser_sample', 'a16'), ('loser_coadd', 'i2'),
+                             #('loser_battle_bin', 'i4')
+        try:
+            h5file.removeNode('/gz2spiralwarsok', recursive=True)
+        except tables.NodeError:
+            pass
+        spiraltable = h5file.createTable("/", "gz2spiralwarsok", dtype,
+                "GZ2 spiral wars results matched to standard classifications with bins",
+                expectedrows=spiralwars.nrows)
+        try:
+            h5file.removeNode('/gz2barwarsok', recursive=True)
+        except tables.NodeError:
+            pass
+        bartable = h5file.createTable("/", "gz2barwarsok", dtype,
+                "GZ2 bar wars results matched to standard classifications with bins",
+                expectedrows=barwars.nrows)
+        for warcombos in [(spiralwars, spiraltable),
+                         (barwars, bartable)]:
+            wars, table = warcombos
+            print len(wars)
+            for w in wars:
+                if w['winner_battle_bin'] == w['loser_battle_bin']:
+                    row = [(w['wars_classification_id'], w['match_classification_id'],
+                            w['annotation_id'], w['task_id'], w['user_id'],
+                            w['starter_asset_id'], w['winner_asset_id'], w['loser_asset_id'],
+                            w['winner_objid'], w['loser_objid'],
+                            w['winner_sample'], w['loser_sample'],
+                            w['winner_redshift_bin'], w['winner_magsize_bin'], w['winner_battle_bin'])]
+                    table.append(row)
+            print len(table)
+            h5file.flush()
+        
 def add_gz2_info():
     with tables.openFile('../data/final/gz2table.h5', mode = "r+") as h5file:
         rec = pyfits.getdata('../gz2sample_final_wvt.fits')
@@ -437,18 +577,20 @@ def h5tocsv():
     writer.writerow(h5file.root.gz2table.colnames)
     writer.writerows(h5file.root.gz2table[:])
     writer = csv.writer(open('../data/final/gz2spiralwars.csv', 'wb'))
-    writer.writerow(h5file.root.gz2spiralwars.colnames)
-    writer.writerows(h5file.root.gz2spiralwars[:])
+    writer.writerow(h5file.root.gz2spiralwarsok.colnames)
+    writer.writerows(h5file.root.gz2spiralwarsok[:])
     writer = csv.writer(open('../data/final/gz2barwars.csv', 'wb'))
-    writer.writerow(h5file.root.gz2barwars.colnames)
-    writer.writerows(h5file.root.gz2barwars[:])
+    writer.writerow(h5file.root.gz2barwarsok.colnames)
+    writer.writerows(h5file.root.gz2barwarsok[:])
     h5file.close()
 
 def h5tofits():
     h5file = tables.openFile('../data/final/gz2table.h5')
     pyfits.writeto('../data/final/gz2table.fits', h5file.root.gz2table.read())
-    pyfits.writeto('../data/final/gz2spiralwars.fits', h5file.root.gz2spiralwars.read())
-    pyfits.writeto('../data/final/gz2barwars.fits', h5file.root.gz2barwars.read())
+    #pyfits.writeto('../data/final/gz2spiralwarsall.fits', h5file.root.gz2spiralwars.read())
+    #pyfits.writeto('../data/final/gz2barwarsall.fits', h5file.root.gz2barwars.read())
+    pyfits.writeto('../data/final/gz2spiralwars.fits', h5file.root.gz2spiralwarsok.read())
+    pyfits.writeto('../data/final/gz2barwars.fits', h5file.root.gz2barwarsok.read())
     h5file.close()
 
 def upload_to_casjobs():
