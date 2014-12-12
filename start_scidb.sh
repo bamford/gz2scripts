@@ -11,18 +11,19 @@ sleep 30
 # Use a normal instance
 # Used to use ami-7487651d, which is now depreciated
 # Try latest official ubuntu image: ami-08f40561
+# And again: ami-0d273b64
 
-ec2-run-instances ami-08f40561 --instance-type m1.large --availability-zone us-east-1a --key GZ --group db
+ec2-run-instances ami-0d273b64 --instance-type m1.large --availability-zone us-east-1a --key GZ --group db
 #ec2-run-instances ami-7487651d --instance-type m2.xlarge --availability-zone us-east-1a --key GZ --group db
 
 # Create a volume from the GZ2 database snapshot
 #EC2VOLUME=`ec2-create-volume --size 50 --snapshot snap-6ec77206 --availability-zone us-east-1a | awk '{print $2}'`
 # OR
 # Use the saved reduction snapshot
-#ECVOLUME2=`ec2-create-volume --snapshot snap-24c7c24f --availability-zone us-east-1a | awk '{print $2}'`
+#EC2VOLUME=`ec2-create-volume --snapshot snap-24c7c24f --availability-zone us-east-1a | awk '{print $2}'`
 # OR
 # Use volume saved from the previous GZ2 reduction
-#EC2VOLUME="vol-ca1371a3"
+#EC2VOLUME="vol-44207b2d"
 
 EC2STATUS=""
 while [ "$EC2STATUS" != "running" ]
@@ -62,6 +63,11 @@ echo $EC2URL
 #apt-get install xfsprogs
 #mount /vol
 #xfs_growfs /vol
+
+# prevent apparmour from preventing mysql starting
+# apt-get install apparmor-utils
+# aa-complain /usr/sbin/mysqld
+
 
 # CHANGE RAM AND DISK SPACE USABLE BY MYSQL
 # see ec2.cnf
