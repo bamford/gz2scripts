@@ -1,152 +1,260 @@
-#! /usr/bin/env python
-
-import time
 import numpy as np
-import cProfile as profile
-import random
-import pylab
 from math import floor
-pylab.close()
+import time
+from astropy.io import fits as pyfits
+import os
 
-def wars_sort_swap(galaxies, winners, losers, maxniter=32, damped=True, progressive_damping=True, dfactor=1.0):
-    ngal = len(galaxies)
-    nwars = len(winners)
-    sorted = np.random.permutation(galaxies)
-    for i in range(maxniter):
-        previous = sorted.copy()
-        nswap = 0
-        if progressive_damping:
-            d = dfactor*i
-        else:
-            d = dfactor
-        for battle in np.random.permutation(nwars):
-            w = winners[battle]
-            l = losers[battle]
-            iw = (sorted == w).nonzero()[0][0]
-            il = (sorted == l).nonzero()[0][0]
-            if iw < il:
-                if damped:                    
-                    damp = int(floor((il - iw) * (1-1.0/(d+1))))
-                    ild = il - max(damp - 1, 0)
-                    iwd = iw + damp
-                    sorted[ild+1:il+1] = sorted[ild:il]
-                    sorted[ild] = w
-                    sorted[iw:iwd] = sorted[iw+1:iwd+1]
-                    sorted[iwd] = l
-                else:
-                    sorted[il] = w
-                    sorted[iw] = l
-                nswap += 1
-        nchanged = len((previous != sorted).nonzero()[0])
-        if nchanged == 0:
-            break
-        #print 'niter = %4i:  nswap = %4i,  nchanged = %4i'%(i, nswap, nchanged)
-        if len(np.unique(sorted)) != len(sorted):
-            print 'NOT UNIQUE!'
-    #print 'niter = %4i:  nswap = %4i,  nchanged = %4i'%(i, nswap, nchanged)
-    return sorted, i
+# The damping procedure was been extensively tested, and the default parameters
+# are those found to demonstrate most efficient convergence with realistic simulations
 
+class WarsSort:
+    def __init__(self, galaxies=None, winners=None, losers=None, maxniter=10,
+                 progressive=True, damping_factor=1.0,
+                 progress_figure=False, truth=None):
 
-def wars_sort_test(fn, wrong=0.0, ntime=3, maxniter=32, damped=False, progressive_damping=True,
-                   dfactor=3.0, plots=False):
-    awin = (a >= b)
-    awin = np.where(r > wrong, awin, np.logical_not(awin))
-    winners = np.where(awin, a, b)
-    losers = np.where(awin, b, a)
-    correct = np.sort(galaxies)
-    times = np.zeros(ntime, np.float)
-    mads = np.zeros(ntime, np.float)
-    bias = np.zeros(ntime, np.float)
-    niters = np.zeros(ntime, np.float)
-    np.random.seed(54321)
-    for i in range(ntime):
-        start = time.clock()
-        result, n = fn(galaxies, winners, losers, maxniter=maxniter, damped=damped,
-                       progressive_damping=progressive_damping, dfactor=dfactor)
-        stop = time.clock()
-        times[i] = stop - start
-        mads[i] = np.absolute(result - correct).mean() / ngal * 100
-        bias[i] = ((np.median(result[:ngal//2] - correct[:ngal//2]) - 
-                    np.median(result[ngal//2:] - correct[ngal//2:])) / ngal * 100)
-        niters[i] = n
-    t = np.median(times)
-    m = np.median(mads)
-    s = np.median(bias)
-    n = np.median(niters)
-    #print 'MAD = %5.2f'%m
-    #print 'time = %5.2f'%t
-    if plots:
-        pylab.figure()
-        pylab.plot(correct, galaxies, 'r.')
-        pylab.plot(correct, result, 'g.')
-        pylab.plot([0.0, ngal], [0.0, ngal], '-')
-    return m, s, t, n
+        self.galaxies = self._asarray(galaxies)
+        self.winners = self._asarray(winners)
+        self.losers = self._asarray(losers)
+        self.maxniter = maxniter
+        self.progressive = progressive
+        self.initial_damping_factor = damping_factor
+        self.damping_factor = damping_factor
+        self.progress_figure = progress_figure
+        self.truth = truth
 
-def do_test():
-    wars_sorts = (wars_sort_swap,)
-    global ngal, nwars, galaxies, a, b, r
-    np.random.seed()
-    ngal=200
-    nwars=2000
-    galaxies = np.random.permutation(ngal)
-    a = galaxies[np.random.randint(ngal, size=nwars)]
-    b = galaxies[np.random.randint(ngal, size=nwars)]
-    r = np.random.uniform(size=nwars)
-    results = []
-    for fn in wars_sorts:
-        print fn.__name__
-        print '%5s %8s %8s %11s %8s %5s %5s %5s %5s'%('wrong', 'maxniter', 'damped', 'progressive', 'dfactor', 'mad%', 'bias%', 'time', 'niter')
-        for wrong in (0.05,):# 0.10, 0.20):
-            for maxniter in (32,):# 64, 128):
-                for progressive in (False, True):
-                    for dfactor in (0.0, 0.5, 1.0, 2.0, 4.0):
-                        if (dfactor < 0.000001) and progressive: continue
-                        damped = dfactor > 0.000001
-                        if not progressive:
-                            dfactor *= maxniter//2
-                        m, s, t, n = wars_sort_test(fn, wrong=wrong, maxniter=maxniter, damped=damped,
-                                                 progressive_damping=progressive, dfactor=dfactor, plots=True)
-                        print '%5.2f %8i %8s %11s %8.2f %5.2f %5.2f %5.2f %5i'%(wrong, maxniter, damped, progressive, dfactor, m, s, t, n)
-                        pylab.savefig('wars_test_%5.2f_%8i_%8s_%11s_%8.2f.pdf'%(wrong, maxniter, damped, progressive, dfactor))
-                        pylab.close('all')
-                        results.append([wrong, maxniter, damped, progressive, dfactor, m, s, t, n])
-    #plot_test_results(np.array(results))
-    results = np.rec.array(results, names=('wrong', 'maxniter', 'damped', 'progressive',
-                                          'dfactor', 'mad%', 'bias%', 'time', 'niter'))
-    return results
+        self._consistency_check()
 
-def plot_test_results():
-    pass
-
-def do_wars_sort():
-    winners = []
-    losers = []
-    battle_bins = []
-    for l in file('../data/final/wars_battles.csv'):
-        ls = l.split(',')
-        winners.append(ls[4])
-        losers.append(ls[5])
-        battle_bins.append(ls[-1])
-    winners = np.asarray(winners)
-    losers = np.asarray(losers)
-    battle_bins = np.asarray(battle_bins)
-    battles = np.unique(battle_bins)
-    for b in battles:
-        select = battle_bins == b
-        w = winners[select]
-        l = losers[select]
-        galaxies = np.concatenate((w, l))
-        galaxies = np.unique(galaxies)
-        result = wars_sort_swap(galaxies, w, l, niter=8, damped=True,
-                                progressive_damping=True, dfactor=5.0)
+        self._setup_internal_variables()
         
+        if self.truth is not None:
+            self._setup_progress_figure()
 
-def plot_dfactor(niter, dfactor):
-    i = np.arange(niter)
-    dampi = 1-1.0/(dfactor*i+1)
-    pylab.plot(i, dampi)
-    pylab.show()
+    def _asarray(self, x):
+        return np.asarray(x) if (x is not None) else np.zeros(1)
+            
+    def _consistency_check(self):
+        if self.winners.shape != self.losers.shape:
+            raise ValueError("Winners and losers arrays are not"
+                             "the same shape")
+
+        if self.winners.ndim != 1:
+            raise ValueError("Winners and losers arrays are not"
+                             "the correct shape")
+
+        if self.galaxies.ndim != 1:
+            raise ValueError("Winners and losers arrays are not"
+                             "the correct shape")
+
+        if self.progress_figure and (self.truth is None):
+            raise ValueError("To create progress figure you must"
+                             "supply a 'truth' ranking")
+
+        if not set(self.winners).issubset(self.galaxies):
+            raise ValueError("Some winners are not in galaxies array")
+
+        if not set(self.losers).issubset(self.galaxies):
+            raise ValueError("Some losers are not in galaxies array")
+
+    def _setup_internal_variables(self):
+        self.ngal = self.galaxies.shape[0]
+        self.nwars = self.winners.shape[0]
+        self.niter = 0
+        self.nbattle = 0
+        self.nswap = 0
+        self.ranking = np.random.permutation(self.galaxies)
+        self.progress_figure_points = None
+        self.progress_figure_previter_points = None
+        self.progress_figure_label = None
+        self.progress_figure_line = None
+        self.progress_figure_fig = None
+        self.mad = None
+        self.madlist = []
+        self.bias = None
+        self.biaslist = []
+
+    def _update_damping_factor(self):
+        if self.progressive:
+            #self.damping_factor = self.initial_damping_factor * self.niter
+            self.damping_factor = 1 - np.exp(-(self.niter*self.initial_damping_factor))
+        else:
+            self.damping_factor = self.initial_damping_factor
+
+    def _mad(self):
+        return np.absolute(self.ranking - self.truth).mean() / self.ngal * 100
+
+    def _bias(self):
+        mid = self.ngal//2
+        r = self.ranking
+        t = self.truth
+        return ((np.median(r[:mid] - t[:mid]) - np.median(r[mid:] - t[mid:]))
+                / float(self.ngal) * 100)
+
+    def _setup_progress_figure(self):
+        global plt
+        import matplotlib
+        matplotlib.use('TkAgg')
+        from matplotlib import pyplot as plt
+        import matplotlib.gridspec as gridspec
+        if self.progress_figure:
+            plt.ion()
+        if self.progress_figure_fig is None:
+            self.progress_figure_fig = plt.figure(figsize=(8,12))
+        else:
+            self.progress_figure_fig.clear()
+        gs = gridspec.GridSpec(4, 3)
+        ax = plt.subplot(gs[:3, :], aspect=1.0)
+        plt.xlabel('true rank')
+        plt.ylabel('estimated rank')
+        title = ''
+        if self.initial_damping_factor > 0:
+            title += 'damped'
+            if self.progressive:
+                title += ' progressive'
+        plt.title(title)
+        plt.plot([0.0, self.ngal], [0.0, self.ngal], 'k-')
+        ax.scatter(self.truth, self.ranking, c='b', zorder=1, alpha=0.2)
+        self.progress_figure_previter_points = ax.scatter([], [], c='r',
+                                                          zorder=2, alpha=0.4)
+        self.progress_figure_points = ax.scatter(self.truth, self.ranking, c='g',
+                                                 zorder=3, alpha=0.8)
+        self.progress_figure_label = ax.text(self.ngal*0.05, self.ngal*0.8,
+                                    '%4i %5i %5i\n%5.2f %5.2f %5.2f'%(0, 0, 0, 0, 0, 0),
+                                    backgroundcolor='w', fontsize='small')
+        self.progress_figure_label.set_bbox(dict(alpha=0.5, color='w',
+                                                 edgecolor='w'))
+        color='red',
+        plt.axis((0, self.ngal, 0, self.ngal))
+        
+        ax = plt.subplot(gs[3:, :])
+        plt.axis((0, self.nwars*self.maxniter, 0, 30))
+        plt.hlines([5,10,15,20,25], 0, self.nwars*self.maxniter, linestyles='dotted')
+        plt.hlines(self.nwars*np.arange(1, self.maxniter), 0, 30, linestyles='dotted')
+        plt.xlabel('battle number')
+        plt.ylabel('scatter')
+        self.progress_figure_line = ax.plot([0],[0])[0]
+        plt.tight_layout()
+        if self.progress_figure:
+            plt.draw()
+
+    def _update_progress_figure(self):
+        if self.progress_figure_fig is None:
+            self._setup_progress_figure()
+        self.progress_figure_previter_points.set_offsets(
+            np.transpose([self.truth, self.previous_ranking]))
+        self.progress_figure_points.set_offsets(
+            np.transpose([self.truth, self.ranking]))
+        status = '%4i %5i %5i\n%5.2f %5.2f %5.2f'%(self.niter, self.nbattle,
+                                self.nswap, self.damping_factor, self.mad, self.bias)
+        self.progress_figure_label.set_text(status)
+        x, y = self.progress_figure_line.get_data()
+        x = np.concatenate((x, [self.nwars*self.niter + self.nbattle]))
+        y = np.concatenate((y, [self.mad]))
+        self.progress_figure_line.set_data(x, y)
+        if self.progress_figure:
+            plt.draw()
+
+    def _update_progress(self):
+        if self.truth is not None:
+            self.mad = self._mad()
+            self.bias = self._bias()
+            self._update_progress_figure()
+    
+    def iteration(self):
+        self._update_damping_factor()
+        self.nbattle = 0
+        self.nswap = 0
+        self.previous_ranking = self.ranking.copy()
+        for b, battle in enumerate(np.random.permutation(self.nwars)):
+            self.nbattle += 1
+            w = self.winners[battle]
+            l = self.losers[battle]
+            iw = (self.ranking == w).nonzero()[0][0]
+            il = (self.ranking == l).nonzero()[0][0]
+            if iw < il:
+                if self.initial_damping_factor > 0:
+                    damp = int(floor((il - iw) * self.damping_factor))
+                    ild = il - max(damp, 0)
+                    iwd = iw + damp
+                    self.ranking[ild+1:il+1] = self.ranking[ild:il]
+                    self.ranking[ild] = w
+                    self.ranking[iw:iwd] = self.ranking[iw+1:iwd+1]
+                    self.ranking[iwd] = l
+                else:
+                    self.ranking[il] = w
+                    self.ranking[iw] = l
+                self.nswap += 1
+                self._update_progress()
+        self.niter += 1
+        self.madlist.append(self.mad)
+        self.biaslist.append(self.bias)
+                
+    def iterate(self, maxniter=None):
+        if maxniter is None:
+            maxniter = self.maxniter
+        for i in range(maxniter):
+            self.iteration()
+        return self.ranking
+
+    def close(self):
+        if not self.progress_figure_fig is None:
+            plt.close(self.progress_figure_fig)
+
+    def save_progress_figure(self, figname):
+        self._update_progress_figure()
+        self.progress_figure_fig.savefig(figname)
+
+    def sort_battles(self, filename='../data/final/gz2spiralwars.fits.gz', label='spiral'):
+        p = pyfits.getdata('../gz2sample_final_wvt.fits')
+        objid = p.field('OBJID')
+        magsize_bin = p.field('WVT_BIN')
+        redshift_bin = p.field('REDSHIFT_SIMPLE_BIN')
+        rank = np.zeros(objid.shape, np.int) - 1
+        fracrank = np.zeros(objid.shape) - 1
+        battle_bin = np.zeros(objid.shape) - 1
+        data = pyfits.getdata(filename)
+        #data = np.recfromcsv(filename.replace('.fits', '.csv'))
+        battles = np.unique(data.battle_bin)
+        print('Total number of battles = %i'%len(battles))
+        for b in battles:
+            select = data.battle_bin == b
+            w = data.winner_objid[select]
+            l = data.loser_objid[select]
+            galaxies = np.unique(np.concatenate((w, l)))
+            self.galaxies = self._asarray(galaxies)
+            self.winners = self._asarray(w)
+            self.losers = self._asarray(l)
+            self._consistency_check()
+            self._setup_internal_variables()
+            print('Battle %i, ngal = %i, nwars = %i'%(b, self.ngal, self.nwars))
+            self.iterate()
+            for r, id in enumerate(self.ranking):
+                idx = (objid == id).nonzero()[0][0]
+                rank[idx] = r
+                fracrank[idx] = float(r) / self.ngal
+                battle_bin[idx] = b
+
+        cols = [pyfits.Column(name='objid', format='K', array=objid),
+                pyfits.Column(name='redshift_bin', format='J', array=redshift_bin),
+                pyfits.Column(name='magsize_bin', format='J', array=magsize_bin),
+                pyfits.Column(name='battle_bin', format='J', array=battle_bin),
+                pyfits.Column(name='rank', format='J', array=rank),
+                pyfits.Column(name='fracrank', format='E', array=fracrank)]
+        tbhdu=pyfits.BinTableHDU.from_columns(cols)
+        tbhdu.name = 'gz2%swarsrank'%label
+        outfile = '../gz2%swarsrank.fits'%label
+        file_exists = os.path.isfile(outfile)
+        if file_exists:
+            os.remove(outfile)
+        tbhdu.writeto(outfile)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
 
 if __name__ == '__main__':
-    do_test()
-
+    wars_sort = WarsSort()
+    wars_sort.sort_battles('../data/final/gz2spiralwars.fits.gz', 'spiral')
+    wars_sort.sort_battles('../data/final/gz2barwars.fits.gz', 'bar')
